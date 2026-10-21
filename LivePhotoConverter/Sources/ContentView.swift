@@ -176,17 +176,27 @@ final class ConverterViewModel: ObservableObject {
 
     private func refreshPlayerForSelection() {
         player?.pause()
+        player = nil
         guard let item = selectedItem else {
-            player = nil
             DropLog.log("refreshPlayer: no selection")
             return
         }
         DropLog.log("refreshPlayer begin file=\(item.filename) url=\(item.url.path) duration=\(item.duration)")
-        let av = AVPlayer(url: item.url)
-        player = av
-        DropLog.log("refreshPlayer AVPlayer created")
-        seekPlayerToKeyframe(for: item, in: av)
-        DropLog.log("refreshPlayer seek done")
+        let playerItem = AVPlayerItem(url: item.url)
+        let av = AVPlayer(playerItem: playerItem)
+        DropLog.log("refreshPlayer AVPlayer created (deferred UI attach)")
+        // Detach from the ingest Task's immediate SwiftUI invalidation — VideoPlayer
+        // was crashing after "after refreshPlayer" with no further breadcrumbs.
+        DispatchQueue.main.async {
+            DropLog.log("refreshPlayer async attach start itemStatus=\(playerItem.status.rawValue)")
+            self.player = av
+            DropLog.log("refreshPlayer player published to UI")
+            DispatchQueue.main.async {
+                DropLog.log("refreshPlayer async seek start")
+                self.seekPlayerToKeyframe(for: item, in: av)
+                DropLog.log("refreshPlayer seek done")
+            }
+        }
     }
 
     /// Seek preview to the key photo time inside the planned segment.
@@ -196,7 +206,9 @@ final class ConverterViewModel: ObservableObject {
         guard target.isFinite, target >= 0 else { return }
         let time = CMTime(seconds: target, preferredTimescale: 600)
         guard time.isValid, !time.isIndefinite else { return }
-        (av ?? player)?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        // Zero tolerance has crashed some Mac AVPlayer + SwiftUI VideoPlayer paths.
+        let slop = CMTime(seconds: 0.05, preferredTimescale: 600)
+        (av ?? player)?.seek(to: time, toleranceBefore: slop, toleranceAfter: slop)
     }
 
     func loadURLs(_ urls: [URL]) {
@@ -726,13 +738,22 @@ struct ContentView: View {
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
             if let player = model.player {
-                VideoPlayer(player: player)
+                MacPlayerView(player: player)
                     .frame(height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .strokeBorder(Color.primary.opacity(0.08))
                     )
+                    .id(item.id)
+                    .onAppear { DropLog.log("MacPlayerView onAppear item=\(item.filename)") }
+                    .onDisappear { DropLog.log("MacPlayerView onDisappear item=\(item.filename)") }
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+                    .frame(height: 220)
+                    .overlay(Text("Loading preview…").font(.caption).foregroundStyle(.secondary))
+                    .onAppear { DropLog.log("preview placeholder (no player yet) item=\(item.filename)") }
             }
             if let seg = item.segment, seg.sourceDuration > 0 {
                 SegmentTimelineOverlay(
@@ -1069,6 +1090,31 @@ struct ContentView: View {
 }
 
 // MARK: - Segment + keyframe overlay (source timeline)
+
+/// AVPlayerView is more stable than SwiftUI VideoPlayer for local sandbox files on Mac.
+struct MacPlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        DropLog.log("MacPlayerView.makeNSView")
+        let view = AVPlayerView()
+        view.controlsStyle = .inline
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+        if nsView.player !== player {
+            DropLog.log("MacPlayerView.updateNSView swap player")
+            nsView.player = player
+        }
+    }
+
+    static func dismantleNSView(_ nsView: AVPlayerView, coordinator: Void) {
+        DropLog.log("MacPlayerView.dismantleNSView")
+        nsView.player = nil
+    }
+}
 
 struct SegmentTimelineOverlay: View {
     let sourceDuration: TimeInterval
