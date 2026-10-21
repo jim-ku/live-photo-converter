@@ -124,12 +124,15 @@ final class ConverterViewModel: ObservableObject {
     }
 
     private func retainScopedRoot(_ url: URL) {
-        if url.startAccessingSecurityScopedResource() {
+        let ok = url.startAccessingSecurityScopedResource()
+        DropLog.log("startAccessing \(url.path) -> \(ok)")
+        if ok {
             scopedRoots.append(url)
         }
     }
 
     private func releaseScopedRoots() {
+        DropLog.log("releaseScopedRoots count=\(scopedRoots.count)")
         for url in scopedRoots {
             url.stopAccessingSecurityScopedResource()
         }
@@ -138,7 +141,9 @@ final class ConverterViewModel: ObservableObject {
 
     /// Copy into the app sandbox cache so AVFoundation never touches a bare drop URL.
     private static func copyIntoIngestCache(_ url: URL) throws -> URL {
+        DropLog.log("copyIntoIngestCache begin \(url.path)")
         let accessing = url.startAccessingSecurityScopedResource()
+        DropLog.log("copy scoped access=\(accessing)")
         defer {
             if accessing { url.stopAccessingSecurityScopedResource() }
         }
@@ -147,6 +152,8 @@ final class ConverterViewModel: ObservableObject {
             try FileManager.default.removeItem(at: dest)
         }
         try FileManager.default.copyItem(at: url, to: dest)
+        let size = (try? FileManager.default.attributesOfItem(atPath: dest.path)[.size] as? NSNumber)?.int64Value ?? -1
+        DropLog.log("copyIntoIngestCache done dest=\(dest.path) bytes=\(size)")
         return dest
     }
 
@@ -171,11 +178,15 @@ final class ConverterViewModel: ObservableObject {
         player?.pause()
         guard let item = selectedItem else {
             player = nil
+            DropLog.log("refreshPlayer: no selection")
             return
         }
+        DropLog.log("refreshPlayer begin file=\(item.filename) url=\(item.url.path) duration=\(item.duration)")
         let av = AVPlayer(url: item.url)
         player = av
+        DropLog.log("refreshPlayer AVPlayer created")
         seekPlayerToKeyframe(for: item, in: av)
+        DropLog.log("refreshPlayer seek done")
     }
 
     /// Seek preview to the key photo time inside the planned segment.
@@ -189,12 +200,15 @@ final class ConverterViewModel: ObservableObject {
     }
 
     func loadURLs(_ urls: [URL]) {
+        DropLog.log("loadURLs begin count=\(urls.count) paths=\(urls.map(\.path))")
+        statusMessage = "Ingesting… log: \(DropLog.logFileURL.path)"
         for root in urls {
             retainScopedRoot(root)
         }
         let videos = LivePhotoEngine.collectVideos(from: urls)
+        DropLog.log("collectVideos -> \(videos.count) \(videos.map(\.lastPathComponent))")
         guard !videos.isEmpty else {
-            statusMessage = "No MP4/MOV/M4V files found."
+            statusMessage = "No MP4/MOV/M4V files found. Log: \(DropLog.logFileURL.path)"
             return
         }
         // Dedupe by original filename+size when possible; after ingest paths differ.
@@ -205,12 +219,16 @@ final class ConverterViewModel: ObservableObject {
             return
         }
         Task { @MainActor in
+            DropLog.log("ingest Task started fresh=\(fresh.count)")
             var built: [QueueItem] = []
             for url in fresh {
                 let defaultCustom = CustomTrimTemplate.default
                 do {
+                    DropLog.log("ingest item \(url.lastPathComponent)")
                     let local = try Self.copyIntoIngestCache(url)
+                    DropLog.log("loadDuration begin \(local.path)")
                     let d = try await LivePhotoEngine.loadDuration(of: local)
+                    DropLog.log("loadDuration -> \(d)")
                     guard d.isFinite, d >= 0 else {
                         throw LivePhotoEngineError.cannotCreateReader
                     }
@@ -230,7 +248,9 @@ final class ConverterViewModel: ObservableObject {
                         progress: 0,
                         lastPair: nil
                     ))
+                    DropLog.log("queue item built ok \(url.lastPathComponent)")
                 } catch {
+                    DropLog.log("ingest failed \(url.lastPathComponent): \(error)")
                     built.append(QueueItem(
                         id: UUID(),
                         url: url,
@@ -249,14 +269,21 @@ final class ConverterViewModel: ObservableObject {
             if wasEmpty || selectedID == nil {
                 selectedID = built.first(where: { $0.duration > 0 })?.id ?? built.first?.id
             }
+            DropLog.log("before refreshPlayer selected=\(String(describing: selectedID))")
             refreshPlayerForSelection()
+            DropLog.log("after refreshPlayer")
             let skipped = videos.count - fresh.count
             if skipped > 0 {
-                statusMessage = "Added \(built.count); \(skipped) already queued"
+                statusMessage = "Added \(built.count); \(skipped) already queued — Reveal log if crash"
             } else {
-                statusMessage = "Added \(built.count) video\(built.count == 1 ? "" : "s") (\(items.count) total)"
+                statusMessage = "Added \(built.count) video\(built.count == 1 ? "" : "s") (\(items.count) total) — Reveal log if crash"
             }
         }
+    }
+
+    func revealDropLog() {
+        DropLog.revealInFinder()
+        statusMessage = "Log: \(DropLog.logFileURL.path)"
     }
 
     func updateCustom(start: TimeInterval, length: TimeInterval) {
@@ -994,19 +1021,27 @@ struct ContentView: View {
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        DropLog.log("handleDrop providers=\(providers.count)")
         let group = DispatchGroup()
         var urls: [URL] = []
         let lock = NSLock()
 
         for provider in providers {
             group.enter()
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
                 defer { group.leave() }
+                if let error {
+                    DropLog.log("loadItem error: \(error)")
+                }
                 var url: URL?
                 if let data = item as? Data {
                     url = URL(dataRepresentation: data, relativeTo: nil)
+                    DropLog.log("loadItem Data -> \(url?.path ?? "nil")")
                 } else if let u = item as? URL {
                     url = u
+                    DropLog.log("loadItem URL -> \(u.path)")
+                } else {
+                    DropLog.log("loadItem unexpected type=\(String(describing: type(of: item)))")
                 }
                 if let url {
                     lock.lock()
@@ -1017,6 +1052,7 @@ struct ContentView: View {
         }
 
         group.notify(queue: .main) {
+            DropLog.log("handleDrop resolved urls=\(urls.count)")
             model.loadURLs(urls)
         }
         return true

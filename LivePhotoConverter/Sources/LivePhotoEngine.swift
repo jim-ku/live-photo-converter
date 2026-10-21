@@ -193,9 +193,13 @@ final class LivePhotoEngine {
     }
 
     static func loadDuration(of url: URL) async throws -> TimeInterval {
+        DropLog.log("LivePhotoEngine.loadDuration AVURLAsset \(url.path)")
         let asset = AVURLAsset(url: url)
+        DropLog.log("LivePhotoEngine.loadDuration loading .duration")
         let duration = try await asset.load(.duration)
-        return CMTimeGetSeconds(duration)
+        let seconds = CMTimeGetSeconds(duration)
+        DropLog.log("LivePhotoEngine.loadDuration seconds=\(seconds) valid=\(duration.isValid)")
+        return seconds
     }
 
     static func convert(
