@@ -17,7 +17,7 @@ enum DropLog {
     static var lastBreadcrumbURL: URL { directory.appendingPathComponent("last-breadcrumb.txt") }
 
     /// Bumped on each diagnostics push so Console/file show which binary Jim ran.
-    static let sourceRevision = "8da03d9"
+    static let sourceRevision = "55a54c4"
 
     private static let lock = NSLock()
     private static let osLog = Logger(
