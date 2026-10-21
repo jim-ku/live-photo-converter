@@ -125,5 +125,5 @@ cd preview && python3 -m http.server 8765 --bind 127.0.0.1
 
 ## Sponsors
 
-This project uses GitHub Sponsors via [`.github/FUNDING.yml`](.github/FUNDING.yml) (`github: jim-ku`). The **Sponsor** button appears on the repo once Sponsors is enabled on the jim-ku account ([docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository)).
+Support development via [GitHub Sponsors](https://github.com/sponsors/jim-ku). The repo **Sponsor** button is enabled through [`.github/FUNDING.yml`](.github/FUNDING.yml).
 
