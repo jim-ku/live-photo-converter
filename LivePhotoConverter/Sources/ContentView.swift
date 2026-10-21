@@ -283,7 +283,7 @@ final class ConverterViewModel: ObservableObject {
 
     func revealDropLog() {
         DropLog.revealInFinder()
-        statusMessage = "Log: \(DropLog.logFileURL.path)"
+        statusMessage = "Log: \(DropLog.pathHint)"
     }
 
     func updateCustom(start: TimeInterval, length: TimeInterval) {
@@ -555,6 +555,9 @@ struct ContentView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     dropZone
+                    if model.items.isEmpty, !model.statusMessage.isEmpty {
+                        statusBlock
+                    }
                     if !model.items.isEmpty {
                         trimSettings
                         if let item = model.selectedItem {
@@ -585,6 +588,9 @@ struct ContentView: View {
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .navigationTitle("Live Photo Converter")
+        .onAppear {
+            model.statusMessage = "Log: \(DropLog.pathHint)"
+        }
         .onChange(of: model.trimMode) { _ in model.recomputeSegments() }
     }
 
@@ -601,6 +607,9 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button("Reveal log") { model.revealDropLog() }
+                .buttonStyle(.borderless)
+                .help(DropLog.pathHint)
             if !model.items.isEmpty {
                 if !model.overallLabel.isEmpty {
                     Text(model.overallLabel)

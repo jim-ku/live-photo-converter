@@ -55,21 +55,27 @@ open ./build/Build/Products/Debug/LivePhotoConverter.app
 
 ## Debug logs
 
-Crash-surviving breadcrumbs (flush after every line). **Pull latest `main` and rebuild** before using these paths.
+App Sandbox remaps Application Support into the **container**. The host path
+`~/Library/Application Support/LivePhotoConverter/…` will **not** exist.
 
 | What | Where |
 |------|--------|
-| Main log | `~/Library/Application Support/LivePhotoConverter/debug.log` |
-| Last line | `~/Library/Application Support/LivePhotoConverter/last-breadcrumb.txt` |
-| In-app | **Reveal log** |
+| Main log | `~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application Support/LivePhotoConverter/debug.log` |
+| Last line | `…/last-breadcrumb.txt` (same folder) |
+| In-app | **Reveal log** (always in the header — prefers this) |
 | Console.app | `subsystem:com.jim.LivePhotoConverter` |
 
 ```bash
-tail -n 40 ~/Library/Application\ Support/LivePhotoConverter/debug.log
-open -R ~/Library/Application\ Support/LivePhotoConverter/debug.log
+# After ⌘R at least once (creates the file on launch):
+LOG=~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application\ Support/LivePhotoConverter/debug.log
+ls -la "$LOG"
+tail -n 40 "$LOG"
+open -R "$LOG"
 ```
 
-After a crash: paste the last ~30 lines (include the `—— session ——` line) and note whether **Choose files…** also fails or only drag.
+If `No such file`, you have not launched a build that includes `DropLog` yet — pull tip, rebuild, ⌘R, then retry.
+
+After a crash: paste the last ~30 lines (include `—— session ——`) and note Choose files… vs drag.
 
 ## UX notes (Software Team slices)
 

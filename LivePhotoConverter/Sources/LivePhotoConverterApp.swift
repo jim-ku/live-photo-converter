@@ -16,8 +16,11 @@ enum DropLog {
     static var logFileURL: URL { directory.appendingPathComponent("debug.log") }
     static var lastBreadcrumbURL: URL { directory.appendingPathComponent("last-breadcrumb.txt") }
 
+    /// Sandboxed apps resolve Application Support under Containers — never the host ~/Library path.
+    static var pathHint: String { logFileURL.path }
+
     /// Bumped on each diagnostics push so Console/file show which binary Jim ran.
-    static let sourceRevision = "55a54c4"
+    static let sourceRevision = "sandbox-log-path"
 
     private static let lock = NSLock()
     private static let osLog = Logger(
