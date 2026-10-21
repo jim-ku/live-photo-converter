@@ -35,20 +35,30 @@ enum QueueItemStatus: Equatable {
     }
 }
 
+/// Per-clip trim override. `nil` on a queue item means inherit app defaults (badge Default).
+struct TrimSettings: Equatable {
+    var trimMode: TrimMode
+    var customTrim: CustomTrimTemplate
+}
+
 struct QueueItem: Identifiable, Equatable {
     let id: UUID
     let url: URL
     var duration: TimeInterval
     var segment: LivePhotoSegment?
-    /// Per-clip Custom trim (used when global trimMode == .custom).
+    /// Per-clip Custom trim (used when resolved mode is .custom).
     var customTrim: CustomTrimTemplate
     /// Per-clip key photo position within the selected segment (0…1).
     var keyframePercent: Double
+    /// `nil` = Default badge (inherit app trim); set in slice 3 when user overrides.
+    var override: TrimSettings?
     var status: QueueItemStatus
     var progress: Double
     var lastPair: LivePhotoPair?
 
     var filename: String { url.lastPathComponent }
+    var usesOverride: Bool { override != nil }
+    var trimBadgeLabel: String { usesOverride ? "Override" : "Default" }
 }
 
 @MainActor
@@ -256,6 +266,7 @@ final class ConverterViewModel: ObservableObject {
                         segment: seg,
                         customTrim: defaultCustom,
                         keyframePercent: 0.5,
+                        override: nil,
                         status: .pending,
                         progress: 0,
                         lastPair: nil
@@ -270,6 +281,7 @@ final class ConverterViewModel: ObservableObject {
                         segment: nil,
                         customTrim: defaultCustom,
                         keyframePercent: 0.5,
+                        override: nil,
                         status: .failed(error.localizedDescription),
                         progress: 0,
                         lastPair: nil
@@ -573,6 +585,8 @@ struct ContentView: View {
                         statusBlock
                     }
                     if !model.items.isEmpty {
+                        queueList
+                        Divider().padding(.vertical, 4)
                         trimSettings
                         if let item = model.selectedItem {
                             previewSection(for: item)
@@ -592,7 +606,6 @@ struct ContentView: View {
                             keyframeScrubber(for: item)
                         }
                         destinationSettings
-                        queueList
                         actions
                         statusBlock
                     }
@@ -867,22 +880,44 @@ struct ContentView: View {
             HStack {
                 Text("Queue")
                     .font(.subheadline.weight(.semibold))
+                Text("Select a clip to edit trim below")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Text(model.overallLabel)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             ForEach(model.items) { item in
+                let selected = model.selectedID == item.id
                 HStack(alignment: .top, spacing: 8) {
                     Button {
                         model.select(item.id)
                     } label: {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.filename)
-                                    .font(.callout.weight(.medium))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
+                        HStack(spacing: 10) {
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(selected ? Color.accentColor : Color.clear)
+                                .frame(width: 3)
+                                .padding(.vertical, 2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Text(item.filename)
+                                        .font(.callout.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                    Text(item.trimBadgeLabel)
+                                        .font(.caption2.weight(.semibold))
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            Capsule().fill(
+                                                item.usesOverride
+                                                    ? Color.accentColor.opacity(0.9)
+                                                    : Color.secondary.opacity(0.14)
+                                            )
+                                        )
+                                        .foregroundStyle(item.usesOverride ? Color.white : Color.secondary)
+                                }
                                 Text(String(format: "%.1fs", item.duration) + " · " + (item.segment?.summary ?? "—"))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -907,10 +942,12 @@ struct ContentView: View {
                                 .background(Capsule().fill(item.status.tint.opacity(0.18)))
                                 .foregroundStyle(item.status.tint)
                         }
-                        .padding(10)
+                        .padding(.vertical, 10)
+                        .padding(.trailing, 10)
+                        .padding(.leading, 6)
                         .background(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(model.selectedID == item.id ? Color.accentColor.opacity(0.1) : Color.primary.opacity(0.03))
+                                .fill(selected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.03))
                         )
                     }
                     .buttonStyle(.plain)
