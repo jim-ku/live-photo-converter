@@ -709,11 +709,8 @@ struct ContentView: View {
                         Divider().padding(.vertical, 4)
                         trimSummary
                         if let item = model.selectedItem {
-                            // Surface Live Photo window outside collapsed Preview (smoke: trim looked gone).
-                            if let seg = item.segment, seg.sourceDuration > 0 {
-                                trimWindowSection(for: item, seg: seg)
-                            }
-                            coverSection(for: item)
+                            // Soft OPEN: Custom filmstrip directly under trim picker, then Cover.
+                            // Blue window only when Custom filmstrip is not mounted (non-Custom / ≤3s).
                             if item.duration > LivePhotoEngine.maxLiveDuration,
                                item.resolvedTrimMode(appDefaults: model.appDefaults) == .custom {
                                 CustomTrimView(
@@ -742,7 +739,10 @@ struct ContentView: View {
                                         }
                                     )
                                 )
+                            } else if let seg = item.segment, seg.sourceDuration > 0 {
+                                trimWindowSection(for: item, seg: seg)
                             }
+                            coverSection(for: item)
                             previewSection(for: item)
                         }
                         destinationSettings
