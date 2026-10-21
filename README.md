@@ -82,6 +82,7 @@ After a crash: paste the last ~30 lines (include `—— session ——`) and no
 - Drop / choose **appends** to the queue (path duplicates skipped).
 - **Start / Center / End** trim applies to every clip; **Custom** window + **Cover image** are per selected clip.
 - Cover row: square thumb + scrubber + **Set as Cover** (from preview playhead, clamped to trim). Preview timeline shows the Live Photo window (blue) and Cover tick.
+- **Custom** (>3s): inline trim preview above the filmstrip seeks with L/R/mid drag; duration chip on the blue window. Preview Disclosure stays collapsed unless opened.
 - Queue rows show failure reasons; remove with ✕.
 - After a successful run: **Open Photos** and/or **Reveal in Finder**.
 - **Cancel** stops between queue items (in-flight may finish). **Retry failed** re-queues only Failed rows.

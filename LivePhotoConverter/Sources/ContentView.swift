@@ -713,6 +713,7 @@ struct ContentView: View {
                             if item.duration > LivePhotoEngine.maxLiveDuration,
                                item.resolvedTrimMode(appDefaults: model.appDefaults) == .custom {
                                 CustomTrimView(
+                                    url: item.url,
                                     duration: item.duration,
                                     start: Binding(
                                         get: {
@@ -1453,9 +1454,14 @@ struct SegmentTimelineOverlay: View {
 // MARK: - Custom trimmer (sliding ≤3s window)
 
 struct CustomTrimView: View {
+    let url: URL
     let duration: TimeInterval
     @Binding var start: TimeInterval
     @Binding var windowLength: TimeInterval
+
+    /// Time shown in the inline trim preview (active edge while dragging).
+    @State private var previewTime: TimeInterval = 0
+    @State private var isDragging = false
 
     private var maxWindow: TimeInterval {
         min(LivePhotoEngine.maxLiveDuration, max(duration, LivePhotoEngine.minCustomWindow))
@@ -1463,6 +1469,10 @@ struct CustomTrimView: View {
 
     private var clampedLength: TimeInterval {
         min(max(windowLength, LivePhotoEngine.minCustomWindow), maxWindow)
+    }
+
+    private var idlePreviewTime: TimeInterval {
+        start + clampedLength / 2
     }
 
     var body: some View {
@@ -1476,6 +1486,12 @@ struct CustomTrimView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // Slice 8: inline trim preview above filmstrip — does NOT open Preview Disclosure
+            TrimInlinePreviewView(
+                url: url,
+                timeSeconds: isDragging ? previewTime : idlePreviewTime
+            )
+
             // Slice 4: one filmstrip control only — L/R handles = length, mid drag = position
             GeometryReader { geo in
                 let w = geo.size.width
@@ -1485,17 +1501,24 @@ struct CustomTrimView: View {
                     start: start,
                     length: clampedLength,
                     width: w,
-                    height: trackH
-                ) { newStart, newLength in
-                    let len = min(max(newLength, LivePhotoEngine.minCustomWindow), maxWindow)
-                    let st = min(max(newStart, 0), max(0, duration - len))
-                    start = st
-                    windowLength = len
-                }
+                    height: trackH,
+                    onChange: { newStart, newLength in
+                        let len = min(max(newLength, LivePhotoEngine.minCustomWindow), maxWindow)
+                        let st = min(max(newStart, 0), max(0, duration - len))
+                        start = st
+                        windowLength = len
+                    },
+                    onDragPreview: { time, dragging in
+                        isDragging = dragging
+                        if let time {
+                            previewTime = time
+                        }
+                    }
+                )
             }
             .frame(height: 36)
 
-            Text("Drag the blue window to move; pull the L/R handles to set length. Max 3s.")
+            Text("Drag the blue window to move; pull the L/R handles to set length. Max 3s. Preview above seeks with the active edge.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -1508,6 +1531,7 @@ struct CustomTrimView: View {
             let len = min(max(windowLength, LivePhotoEngine.minCustomWindow), maxWindow)
             windowLength = len
             start = min(max(start, 0), max(0, duration - len))
+            previewTime = start + len / 2
         }
     }
 }
@@ -1519,6 +1543,8 @@ struct TimelineTrimBar: View {
     let width: CGFloat
     let height: CGFloat
     let onChange: (TimeInterval, TimeInterval) -> Void
+    /// Slice 8: report seek time for inline preview (nil time only when drag ends).
+    var onDragPreview: ((TimeInterval?, Bool) -> Void)? = nil
 
     @State private var dragMode: DragMode = .none
     @State private var dragOriginStart: TimeInterval = 0
@@ -1534,10 +1560,21 @@ struct TimelineTrimBar: View {
                 .fill(Color.secondary.opacity(0.2))
                 .frame(width: width, height: height)
 
-            // Selection
+            // Selection + duration chip on blue window
             RoundedRectangle(cornerRadius: 6)
                 .fill(Color.accentColor.opacity(0.45))
                 .frame(width: max(x(end) - x(start), 8), height: height)
+                .overlay {
+                    // Duration chip (Art Soft) — hide if window too narrow
+                    if x(end) - x(start) >= 36 {
+                        Text(String(format: "%.1fs", length))
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.92)))
+                    }
+                }
                 .offset(x: x(start))
                 .overlay(alignment: .leading) {
                     handle.offset(x: x(start) - 6)
@@ -1559,6 +1596,7 @@ struct TimelineTrimBar: View {
                         }
                         .onEnded { _ in
                             dragMode = .none
+                            onDragPreview?(nil, false)
                         }
                 )
         }
@@ -1586,6 +1624,17 @@ struct TimelineTrimBar: View {
         return Double(px / width) * duration
     }
 
+    private func previewTime(start st: TimeInterval, length len: TimeInterval) -> TimeInterval {
+        switch dragMode {
+        case .startHandle:
+            return st
+        case .endHandle:
+            return st + len
+        case .move, .none:
+            return st + len / 2
+        }
+    }
+
     private func beginDrag(at px: CGFloat) -> Void {
         let t = time(for: px)
         // ≥20pt hit targets for L/R handles (Art Soft)
@@ -1606,10 +1655,12 @@ struct TimelineTrimBar: View {
             onChange(st, len)
             dragOriginStart = st
             dragOriginLength = len
+            onDragPreview?(previewTime(start: st, length: len), true)
             return
         }
         dragOriginStart = start
         dragOriginLength = length
+        onDragPreview?(previewTime(start: start, length: length), true)
     }
 
     private func applyDrag(translation: CGFloat) {
@@ -1620,6 +1671,7 @@ struct TimelineTrimBar: View {
             let len = min(max(dragOriginLength, LivePhotoEngine.minCustomWindow), maxWin)
             let st = min(max(dragOriginStart + dt, 0), max(0, duration - len))
             onChange(st, len)
+            onDragPreview?(previewTime(start: st, length: len), true)
         case .startHandle:
             var newStart = dragOriginStart + dt
             var newEnd = dragOriginStart + dragOriginLength
@@ -1628,6 +1680,7 @@ struct TimelineTrimBar: View {
                 newStart = newEnd - maxWin
             }
             onChange(newStart, newEnd - newStart)
+            onDragPreview?(previewTime(start: newStart, length: newEnd - newStart), true)
         case .endHandle:
             var newStart = dragOriginStart
             var newEnd = dragOriginStart + dragOriginLength + dt
@@ -1636,6 +1689,7 @@ struct TimelineTrimBar: View {
                 newEnd = newStart + maxWin
             }
             onChange(newStart, newEnd - newStart)
+            onDragPreview?(previewTime(start: newStart, length: newEnd - newStart), true)
         case .none:
             break
         }
@@ -1759,6 +1813,78 @@ struct DefaultsView: View {
 
 
 
+// MARK: - Inline Custom trim preview (slice 8)
+
+/// Lightweight still above the Custom filmstrip — regenerates on scrub time.
+/// Does not touch Preview Disclosure / AVPlayer.
+struct TrimInlinePreviewView: View {
+    let url: URL
+    let timeSeconds: TimeInterval
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.secondary.opacity(0.10))
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: "film")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 120)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08))
+        )
+        .overlay(alignment: .bottomTrailing) {
+            Text(String(format: "%.1fs", timeSeconds))
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.black.opacity(0.55)))
+                .padding(8)
+        }
+        // ~1-frame feel: bucket to 40ms so generator keeps up while dragging
+        .task(id: "\(url.path)|\(String(format: "%.2f", (timeSeconds * 25).rounded() / 25))") {
+            image = await Self.generateThumb(url: url, at: timeSeconds)
+        }
+    }
+
+    private static func generateThumb(url: URL, at seconds: TimeInterval) async -> NSImage? {
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 480, height: 270)
+        let slop = CMTime(seconds: 0.05, preferredTimescale: 600)
+        generator.requestedTimeToleranceAfter = slop
+        generator.requestedTimeToleranceBefore = slop
+        let time = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
+        do {
+            if #available(macOS 13.0, *) {
+                let result = try await generator.image(at: time)
+                let cg = result.image
+                return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+            } else {
+                var actual = CMTime.zero
+                let cg = try generator.copyCGImage(at: time, actualTime: &actual)
+                return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+            }
+        } catch {
+            DropLog.log("TrimInlinePreviewView failed t=\(seconds): \(error)")
+            return nil
+        }
+    }
+}
+
 // MARK: - Cover thumb (slice 7)
 
 /// Square still at Cover time — regenerates when url / time change.
@@ -1827,7 +1953,7 @@ struct HelpView: View {
     private let steps: [(String, String)] = [
         ("Drop or append", "Drop MP4/MOV files or a folder onto the dashed area. With a queue open, use the thin bar under Queue or Add files / Add folder."),
         ("Defaults vs Override", "Defaults (toolbar) set the app trim for new drops and Default-badge clips. Editing This clip’s mode or custom window sets Override for that clip only; Reset clears it."),
-        ("Custom filmstrip", "For clips longer than 3s in Custom mode: drag the blue window to move; pull L/R handles to set length (max 3s)."),
+        ("Custom filmstrip", "For clips longer than 3s in Custom mode: drag the blue window to move; pull L/R handles to set length (max 3s). The inline preview above the strip seeks with the active edge — Preview Disclosure stays collapsed until you open it."),
         ("Cover image", "Cover image is the still frame for the Live Photo (this clip only). Drag the scrubber, or expand Preview and scrub the player, then tap Set as Cover. Does not change Default/Override."),
         ("Preview", "Preview starts collapsed — no player until you expand. Collapse tears the player down. Switching clips while collapsed stays quiet."),
         ("Export / Photos", "Set Photos album and/or Export folder under Destinations. Convert & Save to Photos, or Export pairs to folder."),

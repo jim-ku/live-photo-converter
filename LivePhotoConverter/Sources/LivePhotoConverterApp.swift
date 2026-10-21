@@ -20,7 +20,7 @@ enum DropLog {
     static var pathHint: String { logFileURL.path }
 
     /// Bumped on each diagnostics push so Console/file show which binary Jim ran.
-    static let sourceRevision = "slice7-cover-image"
+    static let sourceRevision = "slice8-inline-trim-preview"
 
     private static let lock = NSLock()
     private static let osLog = Logger(
