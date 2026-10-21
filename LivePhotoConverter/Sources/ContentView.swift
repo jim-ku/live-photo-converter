@@ -666,6 +666,7 @@ struct ContentView: View {
     @StateObject private var model = ConverterViewModel()
     @State private var isDropTargeted = false
     @State private var showingDefaults = false
+    @State private var showingHelp = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -732,6 +733,9 @@ struct ContentView: View {
         .sheet(isPresented: $showingDefaults) {
             DefaultsView(model: model)
         }
+        .sheet(isPresented: $showingHelp) {
+            HelpView()
+        }
     }
 
     private var header: some View {
@@ -750,6 +754,13 @@ struct ContentView: View {
             Button("Defaults") { showingDefaults = true }
                 .buttonStyle(.borderless)
                 .help("App trim defaults (Start / Center / End / Custom)")
+            Button {
+                showingHelp = true
+            } label: {
+                Image(systemName: "questionmark.circle")
+            }
+            .buttonStyle(.borderless)
+            .help("How to use")
             Button("Reveal log") { model.revealDropLog() }
                 .buttonStyle(.borderless)
                 .help(DropLog.pathHint)
@@ -1695,6 +1706,60 @@ struct DefaultsView: View {
                 model.updateAppDefaults(next)
             }
         )
+    }
+}
+
+
+// MARK: - Help (slice 6)
+
+struct HelpView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private let steps: [(String, String)] = [
+        ("Drop or append", "Drop MP4/MOV files or a folder onto the dashed area. With a queue open, use the thin bar under Queue or Add files / Add folder."),
+        ("Defaults vs Override", "Defaults (toolbar) set the app trim for new drops and Default-badge clips. Editing This clip’s mode or custom window sets Override for that clip only; Reset clears it."),
+        ("Custom filmstrip", "For clips longer than 3s in Custom mode: drag the blue window to move; pull L/R handles to set length (max 3s)."),
+        ("Preview", "Preview starts collapsed — no player until you expand. Collapse tears the player down. Switching clips while collapsed stays quiet."),
+        ("Export / Photos", "Set Photos album and/or Export folder under Destinations. Convert & Save to Photos, or Export pairs to folder."),
+        ("Reveal log", "Toolbar Reveal log opens the debug log in Finder if something fails."),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("How to use")
+                    .font(.title2.weight(.semibold))
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(20)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("\(index + 1).")
+                                .font(.callout.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 24, alignment: .trailing)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(step.0)
+                                    .font(.callout.weight(.semibold))
+                                Text(step.1)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+                .padding(20)
+            }
+        }
+        .frame(minWidth: 440, minHeight: 420)
     }
 }
 
