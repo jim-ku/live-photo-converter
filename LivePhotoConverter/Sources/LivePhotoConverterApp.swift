@@ -1,21 +1,29 @@
 import SwiftUI
 import AppKit
 import Foundation
+import OSLog
 
-/// Append-only diagnostics that survive a crash (flush after every line).
+/// Append-only diagnostics that survive a crash (synchronize after every line).
 enum DropLog {
     static let directory: URL = {
-        let base = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        let dir = base.appendingPathComponent("Logs/LivePhotoConverter", isDirectory: true)
+        let dir = base.appendingPathComponent("LivePhotoConverter", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()
 
-    static var logFileURL: URL { directory.appendingPathComponent("drop.log") }
+    static var logFileURL: URL { directory.appendingPathComponent("debug.log") }
     static var lastBreadcrumbURL: URL { directory.appendingPathComponent("last-breadcrumb.txt") }
 
+    /// Bumped on each diagnostics push so Console/file show which binary Jim ran.
+    static let sourceRevision = "8da03d9"
+
     private static let lock = NSLock()
+    private static let osLog = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.jim.LivePhotoConverter",
+        category: "drop"
+    )
     private static let formatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -27,7 +35,11 @@ enum DropLog {
             let stack = exception.callStackSymbols.prefix(24).joined(separator: "\n")
             DropLog.fatal("NSException name=\(exception.name.rawValue) reason=\(exception.reason ?? "nil")\n\(stack)")
         }
-        log("app launch — log at \(logFileURL.path)")
+        let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        let bid = Bundle.main.bundleIdentifier ?? "?"
+        log("—— session —— v\(ver) (\(build)) bundle=\(bid) rev=\(sourceRevision)")
+        log("debug.log path: \(logFileURL.path)")
     }
 
     static func log(_ message: String, file: String = #fileID, line: Int = #line) {
@@ -36,6 +48,7 @@ enum DropLog {
         lock.lock()
         defer { lock.unlock() }
         writeSynced(lineText)
+        osLog.log(level: .default, "\(message, privacy: .public)")
         NSLog("[LivePhotoConverter] %@", message)
     }
 
@@ -45,6 +58,7 @@ enum DropLog {
         lock.lock()
         defer { lock.unlock() }
         writeSynced(lineText)
+        osLog.fault("\(message, privacy: .public)")
         NSLog("[LivePhotoConverter] FATAL %@", message)
     }
 
