@@ -25,9 +25,9 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Live Photo Converter saves paired still + video Live Photos to your library.</string>
+	<string>Video to Live Photo saves paired still + video Live Photos to your library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Live Photo Converter needs Photos access to save Live Photos.</string>
+	<string>Video to Live Photo needs Photos access to save Live Photos.</string>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>

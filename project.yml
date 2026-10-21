@@ -16,6 +16,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jim.LivePhotoConverter
+        PRODUCT_NAME: "Video to Live Photo"
         INFOPLIST_FILE: LivePhotoConverter/Info.plist
         CODE_SIGN_ENTITLEMENTS: LivePhotoConverter/LivePhotoConverter.entitlements
         ENABLE_HARDENED_RUNTIME: YES

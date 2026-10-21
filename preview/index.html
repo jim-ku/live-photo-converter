@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Live Photo Converter</title>
+<title>Video to Live Photo</title>
 <style>
   :root {
     --bg: #1c1c1e;
@@ -157,12 +157,12 @@
 <div class="window">
   <div class="titlebar">
     <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-    <div class="label">Live Photo Converter</div>
+    <div class="label">Video to Live Photo</div>
   </div>
   <div class="header">
     <div class="logo">◎</div>
     <div>
-      <h1>Live Photo Converter</h1>
+      <h1>Video to Live Photo</h1>
       <p>MP4 → Live Photo (≤3s segment)</p>
     </div>
     <span class="count-pill" id="countPill"></span>
@@ -216,7 +216,7 @@
       <div class="card" id="destCard">
         <h3>Destinations</h3>
         <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Photos album</label>
-        <input type="text" id="albumName" value="Live Photo Converter"
+        <input type="text" id="albumName" value="Video to Live Photo"
           style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.25);color:var(--text);font:inherit;margin-bottom:8px" />
         <p class="meta" style="margin:0 0 12px">Saves into this album (created if missing). Not the library root.</p>
         <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Export folder</label>
@@ -235,7 +235,7 @@
 
       <div class="actions">
         <button class="btn btn-primary" id="convertBtn" type="button">Convert &amp; Save to Photos</button>
-        <p class="meta" id="albumHint" style="margin:-4px 0 4px">Saves into album “Live Photo Converter”</p>
+        <p class="meta" id="albumHint" style="margin:-4px 0 4px">Saves into album “Video to Live Photo”</p>
         <button class="btn btn-secondary" id="exportBtn" type="button">Export pairs to folder</button>
         <p class="meta" id="exportHint" style="margin:-4px 0 0">Set an export folder above first</p>
         <div class="progress" id="progress"><i id="bar"></i></div>
@@ -438,7 +438,7 @@ function clearAll() {
 let exportFolderLabel = 'Not set — choose a folder';
 const albumNameEl = $('albumName');
 albumNameEl?.addEventListener('input', () => {
-  const n = albumNameEl.value.trim() || 'Live Photo Converter';
+  const n = albumNameEl.value.trim() || 'Video to Live Photo';
   const hint = $('albumHint');
   if (hint) hint.textContent = 'Saves into album “' + n + '”';
 });
@@ -467,7 +467,7 @@ try {
 
 async function runBatch(kind) {
   if (!items.length || busy) return;
-  const album = (albumNameEl?.value || 'Live Photo Converter').trim() || 'Live Photo Converter';
+  const album = (albumNameEl?.value || 'Video to Live Photo').trim() || 'Video to Live Photo';
   if (kind !== 'photos' && exportFolderLabel.startsWith('Not set')) {
     setStatus('err', 'Choose an export folder first.');
     $('exportFolderPick').click();

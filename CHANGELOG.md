@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Product display name renamed to **Video to Live Photo** (Dock, window title, default Photos album, usage strings). Bundle id `com.jim.LivePhotoConverter` and repo URL unchanged.
+
 ## [0.1.0] — unreleased until GitHub Release
 
 First public cut. App UI base Soft OPEN tip [`8854bc1`](https://github.com/jim-ku/live-photo-converter/commit/8854bc19add18dec84898b70b7276294b7e34a71); docs + release kit land on later tip (see git history). Tag `v0.1.0` only after notarized DMG exists.

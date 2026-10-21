@@ -6,7 +6,7 @@ Engineering / QA reference. User docs live in the root [README](../README.md).
 
 | Action | Where it goes |
 |--------|----------------|
-| **Convert & Save to Photos** | A **custom album** you name (default: `Live Photo Converter`). Album is created if missing; every successful convert in the batch is added. |
+| **Convert & Save to Photos** | A **custom album** you name (default: `Video to Live Photo`). Album is created if missing; every successful convert in the batch is added. |
 | **Export pairs to folder** | Folder from **Export folder…**. HEIC+MOV pairs written **flat** with unique names (`LivePhoto-<id>.HEIC` / `.MOV`). Path remembered via UserDefaults + security-scoped bookmark. |
 
 ### Photos album API path

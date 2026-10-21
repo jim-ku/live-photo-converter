@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a simple read-only DMG from a signed .app
-# Usage: make-dmg.sh /path/to/LivePhotoConverter.app [VERSION]
+# Usage: make-dmg.sh "/path/to/Video to Live Photo.app" [VERSION]
 set -euo pipefail
 
 die() { echo "error: $*" >&2; exit 1; }
@@ -9,12 +9,12 @@ die() { echo "error: $*" >&2; exit 1; }
 
 APP="${1:-}"
 VERSION="${2:-${VERSION:-0.1.0}}"
-[[ -n "$APP" && -d "$APP" ]] || die "usage: $0 /path/to/LivePhotoConverter.app [VERSION]"
+[[ -n "$APP" && -d "$APP" ]] || die "usage: $0 "/path/to/Video to Live Photo.app" [VERSION]"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGE="$ROOT/build/dmg-stage"
 DIST="$ROOT/dist"
-VOL="Live Photo Converter"
+VOL="Video to Live Photo"
 DMG_RW="$ROOT/build/LivePhotoConverter-${VERSION}-rw.dmg"
 DMG_OUT="$DIST/LivePhotoConverter-${VERSION}.dmg"
 

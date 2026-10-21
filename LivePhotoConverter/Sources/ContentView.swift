@@ -98,8 +98,8 @@ final class ConverterViewModel: ObservableObject {
     /// Last batch destination — used by Retry failed.
     private var lastBatchWasPhotos = true
 
-    /// Photos album title — default “Live Photo Converter”; persisted in UserDefaults.
-    @Published var albumName: String = UserDefaults.standard.string(forKey: ConverterViewModel.albumNameKey) ?? "Live Photo Converter" {
+    /// Photos album title — default “Video to Live Photo”; persisted in UserDefaults.
+    @Published var albumName: String = UserDefaults.standard.string(forKey: ConverterViewModel.albumNameKey) ?? "Video to Live Photo" {
         didSet { UserDefaults.standard.set(albumName, forKey: Self.albumNameKey) }
     }
 
@@ -754,7 +754,7 @@ struct ContentView: View {
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .navigationTitle("Live Photo Converter")
+        .navigationTitle("Video to Live Photo")
         .onAppear {
             model.statusMessage = "Log: \(DropLog.pathHint)"
         }
@@ -772,7 +772,7 @@ struct ContentView: View {
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.pink)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Live Photo Converter")
+                Text("Video to Live Photo")
                     .font(.headline)
                 Text("MP4 → Live Photo (≤3s segment)")
                     .font(.caption)
@@ -1247,7 +1247,7 @@ struct ContentView: View {
 
     private var albumSaveCaption: String {
         let name = model.albumName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let label = name.isEmpty ? "Live Photo Converter" : name
+        let label = name.isEmpty ? "Video to Live Photo" : name
         return "Saves into album “\(label)”"
     }
 

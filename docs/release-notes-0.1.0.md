@@ -1,4 +1,4 @@
-## Live Photo Converter v0.1.0
+## Video to Live Photo v0.1.0
 
 First public macOS release (Developer ID signed + notarized).
 
@@ -7,7 +7,7 @@ First public macOS release (Developer ID signed + notarized).
 ### Install
 
 1. Download `LivePhotoConverter-0.1.0.dmg` below.
-2. Open the DMG → drag **Live Photo Converter** to Applications.
+2. Open the DMG → drag **Video to Live Photo** to Applications.
 3. On first launch, allow Photos access when prompted.
 
 If Gatekeeper warns: right-click → Open (one-time), or System Settings → Privacy & Security → Open Anyway. The build is notarized; a warning usually means the staple check has not finished yet.

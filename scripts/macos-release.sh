@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build, Developer-ID-sign, notarize, staple, and DMG Live Photo Converter.
+# Build, Developer-ID-sign, notarize, staple, and DMG Video to Live Photo.
 # Must run on macOS with a real Developer ID identity — will not fake signing.
 set -euo pipefail
 
@@ -17,7 +17,7 @@ SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 ARCHIVE_PATH="${ARCHIVE_PATH:-$ROOT/build/LivePhotoConverter.xcarchive}"
 EXPORT_PATH="${EXPORT_PATH:-$ROOT/build/export}"
-APP_NAME="LivePhotoConverter.app"
+APP_NAME="Video to Live Photo.app"
 ZIP_PATH="$ROOT/build/LivePhotoConverter-${VERSION}.zip"
 
 [[ -n "$TEAM_ID" ]] || die "set TEAM_ID (Apple Team ID)"

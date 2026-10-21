@@ -10,6 +10,8 @@ git rev-parse --short HEAD   # paste into results
 
 Build: Xcode 15+ → scheme **LivePhotoConverter** → **My Mac** → ⌘R.
 
+After rebuild, confirm Dock / window title / default Photos album show **Video to Live Photo** (bundle id remains `com.jim.LivePhotoConverter`).
+
 ## Pass criteria
 
 Check each row. **PASS** only if all applicable rows are green.

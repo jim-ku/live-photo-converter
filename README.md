@@ -1,4 +1,4 @@
-# Live Photo Converter
+# Video to Live Photo
 
 Mac app that turns **MP4 / MOV / M4V** clips into Apple **Live Photos** (paired **HEIC** still + **MOV** sharing one asset UUID).
 
@@ -20,7 +20,7 @@ Optional CLI build:
 ```bash
 xcodebuild -scheme LivePhotoConverter -configuration Debug \
   -derivedDataPath ./build build
-open ./build/Build/Products/Debug/LivePhotoConverter.app
+open "./build/Build/Products/Debug/Video to Live Photo.app"
 ```
 
 ## Use

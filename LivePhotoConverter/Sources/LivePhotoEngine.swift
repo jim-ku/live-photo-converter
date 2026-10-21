@@ -292,7 +292,7 @@ final class LivePhotoEngine {
     /// `PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle:)`.
     static func resolveOrCreateAlbum(titled title: String) async throws -> PHAssetCollection {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let name = trimmed.isEmpty ? "Live Photo Converter" : trimmed
+        let name = trimmed.isEmpty ? "Video to Live Photo" : trimmed
 
         let status = await requestPhotosAccess()
         guard status == .authorized || status == .limited else {

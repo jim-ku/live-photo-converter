@@ -86,7 +86,7 @@ VERSION=0.1.0
 SCHEME=LivePhotoConverter
 ARCHIVE=build/LivePhotoConverter.xcarchive
 EXPORT=build/export
-APP="$EXPORT/LivePhotoConverter.app"
+APP="$EXPORT/Video to Live Photo.app"
 
 xcodebuild -scheme "$SCHEME" -configuration Release \
   -archivePath "$ARCHIVE" archive \
