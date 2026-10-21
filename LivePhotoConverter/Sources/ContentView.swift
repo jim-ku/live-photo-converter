@@ -1362,10 +1362,6 @@ struct CustomTrimView: View {
         min(max(windowLength, LivePhotoEngine.minCustomWindow), maxWindow)
     }
 
-    private var maxStart: TimeInterval {
-        max(0, duration - clampedLength)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -1377,6 +1373,7 @@ struct CustomTrimView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // Slice 4: one filmstrip control only — L/R handles = length, mid drag = position
             GeometryReader { geo in
                 let w = geo.size.width
                 let trackH: CGFloat = 28
@@ -1395,39 +1392,7 @@ struct CustomTrimView: View {
             }
             .frame(height: 36)
 
-            HStack {
-                Text("Window")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Slider(
-                    value: Binding(
-                        get: { clampedLength },
-                        set: { newLen in
-                            let len = min(max(newLen, LivePhotoEngine.minCustomWindow), maxWindow)
-                            let st = min(start, max(0, duration - len))
-                            start = st
-                            windowLength = len
-                        }
-                    ),
-                    in: LivePhotoEngine.minCustomWindow...max(maxWindow, LivePhotoEngine.minCustomWindow)
-                )
-            }
-
-            HStack {
-                Text("Position")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Slider(
-                    value: Binding(
-                        get: { min(start, maxStart) },
-                        set: { start = min(max($0, 0), maxStart) }
-                    ),
-                    in: 0...max(maxStart, 0.001)
-                )
-                .disabled(maxStart <= 0)
-            }
-
-            Text("Drag the highlighted window on the timeline, or use the sliders. Max length 3s.")
+            Text("Drag the blue window to move; pull the L/R handles to set length. Max 3s.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -1472,10 +1437,10 @@ struct TimelineTrimBar: View {
                 .frame(width: max(x(end) - x(start), 8), height: height)
                 .offset(x: x(start))
                 .overlay(alignment: .leading) {
-                    handle.offset(x: x(start) - 5)
+                    handle.offset(x: x(start) - 6)
                 }
                 .overlay(alignment: .leading) {
-                    handle.offset(x: x(end) - 5)
+                    handle.offset(x: x(end) - 6)
                 }
 
             // Invisible gesture layer
@@ -1497,12 +1462,16 @@ struct TimelineTrimBar: View {
         .frame(width: width, height: height)
     }
 
+    // Art Soft: visible grip; hit testing uses ≥20pt in beginDrag
     private var handle: some View {
         RoundedRectangle(cornerRadius: 2)
             .fill(Color.white)
-            .frame(width: 10, height: height - 4)
+            .frame(width: 12, height: height - 2)
             .shadow(radius: 1)
     }
+
+    /// Minimum handle hit width in points (Art Soft slice-4 add-on).
+    private var handleHitPts: CGFloat { 20 }
 
     private func x(_ t: TimeInterval) -> CGFloat {
         guard duration > 0, width > 0 else { return 0 }
@@ -1516,10 +1485,12 @@ struct TimelineTrimBar: View {
 
     private func beginDrag(at px: CGFloat) -> Void {
         let t = time(for: px)
-        let handleHit: TimeInterval = max(duration * 0.02, 0.08)
-        if abs(t - start) <= handleHit {
+        // ≥20pt hit targets for L/R handles (Art Soft)
+        let startPx = x(start)
+        let endPx = x(end)
+        if abs(px - startPx) <= handleHitPts / 2 {
             dragMode = .startHandle
-        } else if abs(t - end) <= handleHit {
+        } else if abs(px - endPx) <= handleHitPts / 2 {
             dragMode = .endHandle
         } else if t >= start && t <= end {
             dragMode = .move
