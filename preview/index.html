@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Live Photo Converter</title>
+<style>
+  :root {
+    --bg: #1c1c1e;
+    --text: #f5f5f7;
+    --muted: #a1a1a6;
+    --accent: #0a84ff;
+    --green: #30d158;
+    --orange: #ff9f0a;
+    --red: #ff453a;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; font-family: var(--font); color: var(--text);
+    background: radial-gradient(1200px 600px at 50% -10%, #2a1a22 0%, var(--bg) 55%);
+    display: flex; justify-content: center; padding: 36px 16px 60px;
+  }
+  .window {
+    width: min(600px, 100%);
+    background: rgba(28,28,30,0.94);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+    overflow: hidden;
+  }
+  .titlebar {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .titlebar .label { flex: 1; text-align: center; font-size: 13px; color: var(--muted); margin-right: 48px; }
+  .header { display: flex; align-items: center; gap: 12px; padding: 16px 24px 8px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(145deg, #ff6b8a, #ff2d55);
+    display: grid; place-items: center; font-size: 18px;
+  }
+  .header h1 { margin: 0; font-size: 17px; }
+  .header p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+  .clear-btn, .count-pill {
+    margin-left: auto; background: none; border: none; color: var(--accent);
+    font-size: 13px; cursor: pointer;
+  }
+  .count-pill {
+    margin-right: 10px; color: var(--text); cursor: default;
+    background: rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 999px;
+    font-variant-numeric: tabular-nums; font-size: 12px; display: none;
+  }
+  .body { padding: 12px 24px 28px; }
+  .drop {
+    border: 2px dashed rgba(255,255,255,0.18); border-radius: 16px;
+    min-height: 180px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 10px; text-align: center; padding: 24px;
+    background: rgba(255,255,255,0.03); cursor: pointer; transition: .15s;
+  }
+  .drop.drag { border-color: var(--accent); background: rgba(10,132,255,0.1); }
+  .drop.has { min-height: 100px; border-style: solid; border-color: rgba(255,255,255,0.1); }
+  .drop h2 { margin: 0; font-size: 17px; }
+  .drop .hint { margin: 0; max-width: 420px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    appearance: none; border: none; border-radius: 10px; padding: 10px 16px;
+    font-size: 14px; font-weight: 560; cursor: pointer; font-family: inherit;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid rgba(255,255,255,0.1); }
+  .btn-secondary:disabled { opacity: .45; cursor: not-allowed; }
+  .panel { display: none; margin-top: 16px; }
+  .panel.show { display: block; }
+  .card {
+    margin-top: 14px; padding: 14px; border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+  }
+  .card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+  .seg {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  }
+  .seg button {
+    border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
+    color: var(--text); border-radius: 8px; padding: 8px 4px; font-size: 12px;
+    cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .banner {
+    display: flex; gap: 10px; margin-top: 12px; padding: 10px; border-radius: 10px;
+    background: rgba(10,132,255,0.12); font-size: 12px; color: var(--muted); line-height: 1.4;
+  }
+  .banner.warn { background: rgba(255,159,10,0.14); }
+  .banner strong { display: block; color: var(--text); margin-bottom: 2px; font-size: 13px; }
+  .preview {
+    height: 200px; border-radius: 12px; background: #000; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08); margin-top: 14px;
+  }
+  .preview video { width: 100%; height: 100%; object-fit: contain; }
+  .trim-ui { margin-top: 12px; }
+  .timeline {
+    position: relative; height: 28px; border-radius: 6px;
+    background: rgba(255,255,255,0.12); margin: 8px 0 10px; user-select: none; touch-action: none;
+  }
+  .window-sel {
+    position: absolute; top: 0; bottom: 0; border-radius: 6px;
+    background: rgba(10,132,255,0.5); border: 1px solid rgba(255,255,255,0.5);
+  }
+  .handle {
+    position: absolute; top: 2px; bottom: 2px; width: 10px; margin-left: -5px;
+    background: #fff; border-radius: 2px; cursor: ew-resize; box-shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
+  .sliders label {
+    display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 6px;
+  }
+  .sliders input[type=range] { flex: 1; accent-color: var(--accent); }
+  .meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .queue { margin-top: 14px; }
+  .q-item {
+    display: flex; gap: 12px; align-items: flex-start; padding: 10px;
+    border-radius: 10px; background: rgba(255,255,255,0.03); margin-top: 6px; cursor: pointer;
+  }
+  .q-item.sel { background: rgba(10,132,255,0.12); }
+  .q-item .name { font-size: 13px; font-weight: 560; }
+  .q-item .sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+  .badge {
+    margin-left: auto; font-size: 11px; font-weight: 600; padding: 3px 8px;
+    border-radius: 999px; white-space: nowrap;
+  }
+  .badge.pending { background: rgba(255,255,255,0.1); color: var(--muted); }
+  .badge.converting { background: rgba(10,132,255,0.2); color: #9ccfff; }
+  .badge.done { background: rgba(48,209,88,0.2); color: #8dffb0; }
+  .badge.failed { background: rgba(255,69,58,0.2); color: #ffb0aa; }
+  .q-prog { height: 3px; background: rgba(255,255,255,0.1); border-radius: 99px; margin-top: 6px; overflow: hidden; }
+  .q-prog > i { display: block; height: 100%; width: 0; background: var(--accent); }
+  .actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .actions .btn { width: 100%; padding: 12px; }
+  .progress { display: none; height: 4px; border-radius: 99px; background: rgba(255,255,255,0.1); overflow: hidden; }
+  .progress.show { display: block; }
+  .progress > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #64d2ff); }
+  .status {
+    display: none; margin-top: 12px; padding: 12px; border-radius: 10px;
+    font-size: 13px; line-height: 1.45; white-space: pre-line;
+  }
+  .status.show { display: block; }
+  .status.ok { background: rgba(48,209,88,0.12); }
+  .status.info { background: rgba(10,132,255,0.12); }
+  .status.err { background: rgba(255,69,58,0.14); }
+  .foot { margin-top: 16px; text-align: center; font-size: 11px; color: var(--muted); }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+    <div class="label">Live Photo Converter</div>
+  </div>
+  <div class="header">
+    <div class="logo">◎</div>
+    <div>
+      <h1>Live Photo Converter</h1>
+      <p>MP4 → Live Photo (≤3s segment)</p>
+    </div>
+    <span class="count-pill" id="countPill"></span>
+    <button class="clear-btn" id="clearBtn" type="button" style="display:none">Clear</button>
+  </div>
+  <div class="body">
+    <div class="drop" id="drop" tabindex="0">
+      <div style="font-size:32px" id="dropIcon">📁</div>
+      <h2 id="dropTitle">Drop MP4s or a folder</h2>
+      <p class="hint" id="dropHint">Live Photos use up to 3s. Clips shorter than 3s keep full length. Longer clips use Start / Center / End / Custom trim. Batch supported.</p>
+      <div class="btn-row" id="chooseRow">
+        <button class="btn btn-primary" id="chooseFiles" type="button">Choose files…</button>
+        <button class="btn btn-secondary" id="chooseFolder" type="button">Choose folder…</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel">
+      <div class="card">
+        <h3>Trim mode (for clips longer than 3s)</h3>
+        <div class="seg" id="modeSeg">
+          <button type="button" data-mode="start3s">Start 3s</button>
+          <button type="button" data-mode="center3s" class="active">Center 3s</button>
+          <button type="button" data-mode="end3s">End 3s</button>
+          <button type="button" data-mode="custom">Custom</button>
+        </div>
+        <p class="meta" style="margin:8px 0 0">Applied to every item. Clips ≤3s always keep full length (no pad/loop).</p>
+        <div class="banner" id="banner"><div><strong id="bannerTitle">Selected segment</strong><span id="bannerText"></span></div></div>
+      </div>
+
+      <div class="preview"><video id="video" controls playsinline></video></div>
+
+      <div class="card trim-ui" id="customCard" hidden>
+        <h3>Custom trim <span class="meta" id="customMeta"></span></h3>
+        <div class="timeline" id="timeline">
+          <div class="window-sel" id="win">
+            <div class="handle" id="hStart" style="left:0"></div>
+            <div class="handle" id="hEnd" style="left:100%"></div>
+          </div>
+        </div>
+        <div class="sliders">
+          <label>Window <input type="range" id="lenSlider" min="0.5" max="3" step="0.05" value="3" /></label>
+          <label>Position <input type="range" id="posSlider" min="0" max="10" step="0.05" value="0" /></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Key photo <span class="meta" id="keyMeta">50% of segment</span></h3>
+        <input type="range" id="keySlider" min="5" max="95" value="50" style="width:100%; accent-color:var(--accent)" />
+      </div>
+
+      <div class="card" id="destCard">
+        <h3>Destinations</h3>
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Photos album</label>
+        <input type="text" id="albumName" value="Live Photo Converter"
+          style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.25);color:var(--text);font:inherit;margin-bottom:8px" />
+        <p class="meta" style="margin:0 0 12px">Saves into this album (created if missing). Not the library root.</p>
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px">Export folder</label>
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px">
+          <div id="exportPath" class="meta" style="flex:1;padding:8px;border-radius:8px;background:rgba(255,255,255,0.05);word-break:break-all">Not set — choose a folder</div>
+          <button class="btn btn-secondary" id="exportFolderBtn" type="button" style="white-space:nowrap">Export folder…</button>
+        </div>
+        <p class="meta" style="margin:0">HEIC+MOV pairs write flat here with unique names. Path is remembered in this preview session.</p>
+        <input type="file" id="exportFolderPick" webkitdirectory directory style="display:none" />
+      </div>
+
+      <div class="queue">
+        <h3 style="font-size:13px;margin:0 0 4px">Queue</h3>
+        <div id="queueList"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="convertBtn" type="button">Convert &amp; Save to Photos</button>
+        <p class="meta" id="albumHint" style="margin:-4px 0 4px">Saves into album “Live Photo Converter”</p>
+        <button class="btn btn-secondary" id="exportBtn" type="button">Export pairs to folder</button>
+        <p class="meta" id="exportHint" style="margin:-4px 0 0">Set an export folder above first</p>
+        <div class="progress" id="progress"><i id="bar"></i></div>
+      </div>
+      <div class="status info" id="status"></div>
+    </div>
+    <p class="foot">UI preview only — real conversion runs in the macOS app (HEIC still + MOV pair).</p>
+  </div>
+</div>
+<input type="file" id="fileMulti" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" multiple />
+<input type="file" id="fileFolder" webkitdirectory directory multiple />
+
+<script>
+const MIN = 1.5, MAX = 3.0, MIN_WIN = 0.5;
+let mode = 'center3s';
+let custom = { startOffset: 0, windowLength: 3 };
+let keyPct = 0.5;
+let items = [];
+let selected = 0;
+let busy = false;
+let drag = null;
+
+const $ = (id) => document.getElementById(id);
+
+function plannedSegment(dur) {
+  const shortWarn = dur > 0 && dur < MIN;
+  if (dur <= MAX) {
+    return { start: 0, duration: dur, sourceDuration: dur, mode, isShortWarning: shortWarn };
+  }
+  let start = 0, length = MAX;
+  if (mode === 'start3s') { start = 0; length = MAX; }
+  else if (mode === 'center3s') { start = Math.max(0, (dur - MAX) / 2); length = MAX; }
+  else if (mode === 'end3s') { start = Math.max(0, dur - MAX); length = MAX; }
+  else {
+    const maxWin = Math.min(MAX, dur);
+    length = Math.min(Math.max(custom.windowLength, MIN_WIN), maxWin);
+    const maxStart = Math.max(0, dur - length);
+    start = Math.min(Math.max(custom.startOffset, 0), maxStart);
+  }
+  return { start, duration: length, sourceDuration: dur, mode, isShortWarning: false };
+}
+
+function summary(seg) {
+  if (seg.sourceDuration <= MAX + 0.001) {
+    if (seg.isShortWarning) {
+      return `Using full clip (${seg.sourceDuration.toFixed(1)}s) — under ${MIN}s; Photos may not treat it as ideal Live Photo length`;
+    }
+    return `Using full clip (${seg.sourceDuration.toFixed(1)}s)`;
+  }
+  const end = seg.start + seg.duration;
+  const labels = { start3s: 'Start 3s', center3s: 'Center 3s', end3s: 'End 3s', custom: 'Custom' };
+  return `${labels[seg.mode]}: ${seg.start.toFixed(1)}s–${end.toFixed(1)}s of ${seg.sourceDuration.toFixed(1)}s`;
+}
+
+function recompute() {
+  items.forEach(it => { it.segment = plannedSegment(it.duration); });
+  render();
+}
+
+function setStatus(kind, text) {
+  const el = $('status');
+  el.className = 'status show ' + kind;
+  el.textContent = text;
+}
+
+function render() {
+  const has = items.length > 0;
+  $('panel').classList.toggle('show', has);
+  $('drop').classList.toggle('has', has);
+  $('clearBtn').style.display = has ? 'block' : 'none';
+  $('countPill').style.display = has ? 'inline-block' : 'none';
+  $('chooseRow').style.display = has ? 'none' : 'flex';
+  $('dropHint').hidden = has;
+  if (!has) {
+    $('dropIcon').textContent = '📁';
+    $('dropTitle').textContent = 'Drop MP4s or a folder';
+    return;
+  }
+  const done = items.filter(i => i.status === 'done').length;
+  $('countPill').textContent = `${done}/${items.length}`;
+  $('dropIcon').textContent = '✓';
+  $('dropTitle').textContent = `${items.length} video${items.length === 1 ? '' : 's'} in queue`;
+
+  document.querySelectorAll('#modeSeg button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+
+  const cur = items[selected] || items[0];
+  const seg = cur.segment;
+  const banner = $('banner');
+  banner.className = 'banner' + (seg.isShortWarning ? ' warn' : '');
+  $('bannerTitle').textContent = seg.isShortWarning ? 'Short clip warning' : 'Selected segment';
+  $('bannerText').textContent = summary(seg);
+
+  $('customCard').hidden = !(cur.duration > MAX && mode === 'custom');
+  if (cur.duration > MAX && mode === 'custom') updateTrimUI(cur.duration);
+
+  $('keyMeta').textContent = `${Math.round(keyPct * 100)}% of segment · ${(seg.start + seg.duration * keyPct).toFixed(1)}s source`;
+
+  if (cur.objectURL) {
+    if ($('video').src !== cur.objectURL) $('video').src = cur.objectURL;
+  }
+
+  const list = $('queueList');
+  list.innerHTML = '';
+  items.forEach((it, idx) => {
+    const div = document.createElement('div');
+    div.className = 'q-item' + (idx === selected ? ' sel' : '');
+    div.innerHTML = `
+      <div style="flex:1;min-width:0">
+        <div class="name">${escapeHtml(it.name)}</div>
+        <div class="sub">${it.duration.toFixed(1)}s · ${escapeHtml(summary(it.segment))}</div>
+        ${it.status === 'converting' ? `<div class="q-prog"><i style="width:${(it.progress*100)|0}%"></i></div>` : ''}
+      </div>
+      <span class="badge ${it.status}">${labelStatus(it.status)}</span>`;
+    div.onclick = () => { if (!busy) { selected = idx; render(); } };
+    list.appendChild(div);
+  });
+}
+
+function labelStatus(s) {
+  return ({ pending: 'Pending', converting: 'Converting', done: 'Done', failed: 'Failed' })[s] || s;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function updateTrimUI(dur) {
+  const maxWin = Math.min(MAX, dur);
+  let len = Math.min(Math.max(custom.windowLength, MIN_WIN), maxWin);
+  let start = Math.min(Math.max(custom.startOffset, 0), Math.max(0, dur - len));
+  custom = { startOffset: start, windowLength: len };
+  const win = $('win');
+  const left = (start / dur) * 100;
+  const width = (len / dur) * 100;
+  win.style.left = left + '%';
+  win.style.width = width + '%';
+  $('hStart').style.left = '0';
+  $('hEnd').style.left = '100%';
+  $('customMeta').textContent = `${start.toFixed(1)}s – ${(start+len).toFixed(1)}s (${len.toFixed(1)}s)`;
+  $('lenSlider').max = maxWin;
+  $('lenSlider').value = len;
+  $('posSlider').max = Math.max(dur - len, 0.001);
+  $('posSlider').value = start;
+}
+
+function addFiles(fileList) {
+  const files = [...fileList].filter(f => /\.(mp4|mov|m4v)$/i.test(f.name));
+  if (!files.length) {
+    setStatus('err', 'No MP4/MOV/M4V files found.');
+    $('panel').classList.add('show');
+    return;
+  }
+  let pending = files.length;
+  const built = [];
+  files.forEach((file, order) => {
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = () => {
+      const d = probe.duration || 2.0;
+      built[order] = {
+        name: file.name, duration: d, file, objectURL: url,
+        segment: plannedSegment(d), status: 'pending', progress: 0
+      };
+      if (--pending === 0) finishAdd(built.filter(Boolean));
+    };
+    probe.onerror = () => {
+      built[order] = {
+        name: file.name, duration: 2.5, file, objectURL: url,
+        segment: plannedSegment(2.5), status: 'pending', progress: 0
+      };
+      if (--pending === 0) finishAdd(built.filter(Boolean));
+    };
+    probe.src = url;
+  });
+}
+
+function finishAdd(built) {
+  items = items.concat(built);
+  selected = items.length - built.length;
+  recompute();
+  setStatus('info', `${items.length} video${items.length === 1 ? '' : 's'} ready`);
+}
+
+function clearAll() {
+  items.forEach(i => i.objectURL && URL.revokeObjectURL(i.objectURL));
+  items = []; selected = 0; busy = false;
+  $('video').removeAttribute('src');
+  $('progress').classList.remove('show');
+  $('bar').style.width = '0%';
+  $('status').className = 'status';
+  $('convertBtn').disabled = false;
+  $('exportBtn').disabled = false;
+  $('convertBtn').textContent = 'Convert & Save to Photos';
+  render();
+}
+
+
+let exportFolderLabel = 'Not set — choose a folder';
+const albumNameEl = $('albumName');
+albumNameEl?.addEventListener('input', () => {
+  const n = albumNameEl.value.trim() || 'Live Photo Converter';
+  const hint = $('albumHint');
+  if (hint) hint.textContent = 'Saves into album “' + n + '”';
+});
+$('exportFolderBtn')?.addEventListener('click', () => $('exportFolderPick').click());
+$('exportFolderPick')?.addEventListener('change', () => {
+  const files = $('exportFolderPick').files;
+  if (!files?.length) return;
+  // webkitRelativePath gives folder/file — use first path segment as folder name mock
+  const rel = files[0].webkitRelativePath || files[0].name;
+  const folder = rel.includes('/') ? rel.split('/')[0] : '(chosen folder)';
+  exportFolderLabel = '/Exports/' + folder + '  (preview mock path)';
+  try { sessionStorage.setItem('lpcExportFolder', exportFolderLabel); } catch {}
+  $('exportPath').textContent = exportFolderLabel;
+  const hint = $('exportHint');
+  if (hint) hint.textContent = 'Writes HEIC+MOV into the folder above';
+});
+try {
+  const saved = sessionStorage.getItem('lpcExportFolder');
+  if (saved) {
+    exportFolderLabel = saved;
+    $('exportPath').textContent = saved;
+    const hint = $('exportHint');
+    if (hint) hint.textContent = 'Writes HEIC+MOV into the folder above';
+  }
+} catch {}
+
+async function runBatch(kind) {
+  if (!items.length || busy) return;
+  const album = (albumNameEl?.value || 'Live Photo Converter').trim() || 'Live Photo Converter';
+  if (kind !== 'photos' && exportFolderLabel.startsWith('Not set')) {
+    setStatus('err', 'Choose an export folder first.');
+    $('exportFolderPick').click();
+    return;
+  }
+  busy = true;
+  $('convertBtn').disabled = true;
+  $('exportBtn').disabled = true;
+  $('progress').classList.add('show');
+  setStatus('info', kind === 'photos' ? ('Converting & saving to album “' + album + '”…') : ('Exporting HEIC+MOV to ' + exportFolderLabel + '…'));
+
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].status === 'done') continue;
+    selected = i;
+    items[i].status = 'converting';
+    items[i].progress = 0;
+    render();
+    await animateProgress(i);
+    items[i].status = 'done';
+    items[i].progress = 1;
+    const done = items.filter(x => x.status === 'done').length;
+    setStatus('info', `Progress ${done}/${items.length}`);
+    render();
+  }
+  busy = false;
+  $('convertBtn').disabled = false;
+  $('exportBtn').disabled = false;
+  $('convertBtn').textContent = 'Convert & Save to Photos';
+  const ok = items.filter(x => x.status === 'done').length;
+  setStatus('ok', kind === 'photos'
+    ? `Saved ${ok} Live Photo${ok === 1 ? '' : 's'} to album “${album}”.\n(Preview mock — Mac app writes HEIC still + MOV into the album.)`
+    : `Exported ${ok} HEIC+MOV pair${ok === 1 ? '' : 's'} to\n${exportFolderLabel}\n(Preview mock — Mac app writes .HEIC + .MOV flat into the folder.)`);
+  render();
+}
+
+function animateProgress(index) {
+  return new Promise(resolve => {
+    let p = 0;
+    const t = setInterval(() => {
+      p = Math.min(p + 0.1 + Math.random() * 0.1, 1);
+      items[index].progress = p;
+      $('bar').style.width = ((items.filter(x => x.status === 'done').length + p) / items.length * 100) + '%';
+      $('convertBtn').textContent = `Converting ${items.filter(x => x.status === 'done').length}/${items.length}…`;
+      render();
+      if (p >= 1) { clearInterval(t); resolve(); }
+    }, 90);
+  });
+}
+
+// Mode picker
+$('modeSeg').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-mode]');
+  if (!btn || busy) return;
+  mode = btn.dataset.mode;
+  recompute();
+});
+
+$('keySlider').oninput = () => { keyPct = $('keySlider').value / 100; render(); };
+$('lenSlider').oninput = () => {
+  custom.windowLength = parseFloat($('lenSlider').value);
+  recompute();
+};
+$('posSlider').oninput = () => {
+  custom.startOffset = parseFloat($('posSlider').value);
+  recompute();
+};
+
+// Timeline drag
+const timeline = $('timeline');
+timeline.addEventListener('pointerdown', e => {
+  if (busy || mode !== 'custom') return;
+  const cur = items[selected]; if (!cur || cur.duration <= MAX) return;
+  const rect = timeline.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const t = x * cur.duration;
+  const start = custom.startOffset;
+  let len = custom.windowLength;
+  const end = start + len;
+  const hit = Math.max(cur.duration * 0.02, 0.08);
+  let kind = 'move';
+  if (Math.abs(t - start) <= hit) kind = 'start';
+  else if (Math.abs(t - end) <= hit) kind = 'end';
+  else if (t < start || t > end) {
+    const maxWin = Math.min(MAX, cur.duration);
+    len = Math.min(Math.max(len, MIN_WIN), maxWin);
+    custom.startOffset = Math.min(Math.max(t - len / 2, 0), Math.max(0, cur.duration - len));
+    custom.windowLength = len;
+    recompute();
+  }
+  drag = { kind, originStart: custom.startOffset, originLen: custom.windowLength, originX: e.clientX, dur: cur.duration, width: rect.width };
+  timeline.setPointerCapture(e.pointerId);
+});
+timeline.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dt = ((e.clientX - drag.originX) / drag.width) * drag.dur;
+  const maxWin = Math.min(MAX, drag.dur);
+  if (drag.kind === 'move') {
+    const len = Math.min(Math.max(drag.originLen, MIN_WIN), maxWin);
+    custom.windowLength = len;
+    custom.startOffset = Math.min(Math.max(drag.originStart + dt, 0), Math.max(0, drag.dur - len));
+  } else if (drag.kind === 'start') {
+    let newStart = drag.originStart + dt;
+    let newEnd = drag.originStart + drag.originLen;
+    newStart = Math.min(Math.max(newStart, 0), newEnd - MIN_WIN);
+    if (newEnd - newStart > maxWin) newStart = newEnd - maxWin;
+    custom.startOffset = newStart;
+    custom.windowLength = newEnd - newStart;
+  } else if (drag.kind === 'end') {
+    let newStart = drag.originStart;
+    let newEnd = drag.originStart + drag.originLen + dt;
+    newEnd = Math.max(Math.min(newEnd, drag.dur), newStart + MIN_WIN);
+    if (newEnd - newStart > maxWin) newEnd = newStart + maxWin;
+    custom.startOffset = newStart;
+    custom.windowLength = newEnd - newStart;
+  }
+  recompute();
+});
+timeline.addEventListener('pointerup', () => { drag = null; });
+timeline.addEventListener('pointercancel', () => { drag = null; });
+
+$('chooseFiles').onclick = e => { e.stopPropagation(); $('fileMulti').click(); };
+$('chooseFolder').onclick = e => { e.stopPropagation(); $('fileFolder').click(); };
+$('drop').onclick = () => { if (!items.length) $('fileMulti').click(); };
+$('fileMulti').onchange = () => addFiles($('fileMulti').files);
+$('fileFolder').onchange = () => addFiles($('fileFolder').files);
+$('clearBtn').onclick = clearAll;
+$('convertBtn').onclick = () => runBatch('photos');
+$('exportBtn').onclick = () => runBatch('export');
+
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+drop.addEventListener('drop', e => {
+  if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+});
+</script>
+</body>
+</html>

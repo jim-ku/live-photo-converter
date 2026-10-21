@@ -1,0 +1,270 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2E85F98BF953423DB14CC79C /* LivePhotoConverterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* LivePhotoConverterApp.swift */; };
+		A160F9EC5B1A407FABA941CD /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* ContentView.swift */; };
+		4F0A14BEA80F40DBBAD10182 /* LivePhotoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* LivePhotoEngine.swift */; };
+		D23FD87A04F8467FA0C9654A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* Assets.xcassets */; };
+		C96AC33A47A04B6A840CEFB7 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* AVFoundation.framework */; };
+		8734A8E2F4F84BF89B2A32B6 /* Photos.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* Photos.framework */; };
+		758ADC51FA4044069E17558A /* ImageIO.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* ImageIO.framework */; };
+		6715EB61C28D4EF28F57B8F3 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* CoreGraphics.framework */; };
+		BB0898B813054DDBA86104C7 /* UniformTypeIdentifiers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* UniformTypeIdentifiers.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000001 /* LivePhotoConverterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoConverterApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* LivePhotoEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoEngine.swift; sourceTree = "<group>"; };
+		A10000000000000000000004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A10000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000006 /* LivePhotoConverter.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LivePhotoConverter.entitlements; sourceTree = "<group>"; };
+		136E54D983E743209F7F50DE /* LivePhotoConverter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LivePhotoConverter.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000010 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		A10000000000000000000011 /* Photos.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Photos.framework; path = System/Library/Frameworks/Photos.framework; sourceTree = SDKROOT; };
+		A10000000000000000000012 /* ImageIO.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ImageIO.framework; path = System/Library/Frameworks/ImageIO.framework; sourceTree = SDKROOT; };
+		A10000000000000000000013 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		A10000000000000000000014 /* UniformTypeIdentifiers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UniformTypeIdentifiers.framework; path = System/Library/Frameworks/UniformTypeIdentifiers.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B701676ACE164507AC00E9E7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C96AC33A47A04B6A840CEFB7 /* AVFoundation.framework in Frameworks */,
+				8734A8E2F4F84BF89B2A32B6 /* Photos.framework in Frameworks */,
+				758ADC51FA4044069E17558A /* ImageIO.framework in Frameworks */,
+				6715EB61C28D4EF28F57B8F3 /* CoreGraphics.framework in Frameworks */,
+				BB0898B813054DDBA86104C7 /* UniformTypeIdentifiers.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B904CF104C964917AD8E2991 = {
+			isa = PBXGroup;
+			children = (
+				87E22EDA9A4F419B82F5A169 /* LivePhotoConverter */,
+				35A83975DF844B5F82723742 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		87E22EDA9A4F419B82F5A169 /* LivePhotoConverter */ = {
+			isa = PBXGroup;
+			children = (
+				00214BBEEFD04B51A977C1FB /* Sources */,
+				A10000000000000000000004 /* Assets.xcassets */,
+				A10000000000000000000005 /* Info.plist */,
+				A10000000000000000000006 /* LivePhotoConverter.entitlements */,
+			);
+			path = LivePhotoConverter;
+			sourceTree = "<group>";
+		};
+		00214BBEEFD04B51A977C1FB /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000001 /* LivePhotoConverterApp.swift */,
+				A10000000000000000000002 /* ContentView.swift */,
+				A10000000000000000000003 /* LivePhotoEngine.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		35A83975DF844B5F82723742 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				136E54D983E743209F7F50DE /* LivePhotoConverter.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		98FA88AFE57C490D81B53A21 /* LivePhotoConverter */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 78823CC6921C4191B6D6C6FA /* Build configuration list for PBXNativeTarget "LivePhotoConverter" */;
+			buildPhases = (
+				1C856965B4D94BA1A0477F9F /* Sources */,
+				B701676ACE164507AC00E9E7 /* Frameworks */,
+				F25D1D9546B04CB09A64BE2E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LivePhotoConverter;
+			productName = LivePhotoConverter;
+			productReference = 136E54D983E743209F7F50DE /* LivePhotoConverter.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DA6C3560DAA14530B5DE8B5D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					98FA88AFE57C490D81B53A21 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = C76F5EF7F6EE4021AF1E8F1F /* Build configuration list for PBXProject "LivePhotoConverter" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B904CF104C964917AD8E2991;
+			productRefGroup = 35A83975DF844B5F82723742 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				98FA88AFE57C490D81B53A21 /* LivePhotoConverter */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F25D1D9546B04CB09A64BE2E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D23FD87A04F8467FA0C9654A /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1C856965B4D94BA1A0477F9F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2E85F98BF953423DB14CC79C /* LivePhotoConverterApp.swift in Sources */,
+				A160F9EC5B1A407FABA941CD /* ContentView.swift in Sources */,
+				4F0A14BEA80F40DBBAD10182 /* LivePhotoEngine.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		9115B82301B1462B91F2988C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		BF4CACDF9A2E47868BE4CE99 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		D612AD25BA2345FC8927E72B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = LivePhotoConverter/LivePhotoConverter.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LivePhotoConverter/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jim.LivePhotoConverter;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		12F1370C5E99452DA67290A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = LivePhotoConverter/LivePhotoConverter.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = LivePhotoConverter/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jim.LivePhotoConverter;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C76F5EF7F6EE4021AF1E8F1F /* Build configuration list for PBXProject "LivePhotoConverter" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9115B82301B1462B91F2988C /* Debug */,
+				BF4CACDF9A2E47868BE4CE99 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		78823CC6921C4191B6D6C6FA /* Build configuration list for PBXNativeTarget "LivePhotoConverter" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D612AD25BA2345FC8927E72B /* Debug */,
+				12F1370C5E99452DA67290A7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DA6C3560DAA14530B5DE8B5D /* Project object */;
+}

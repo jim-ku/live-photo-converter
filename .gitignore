@@ -1,0 +1,18 @@
+# Xcode / macOS
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+.DS_Store
+*.swp
+*~
+
+# SwiftPM
+.swiftpm/
+.build/
+
+# Archives / scratch
+*.tar
+*.tar.gz
