@@ -84,6 +84,8 @@ final class ConverterViewModel: ObservableObject {
     /// Convenience mirror of `appDefaults.trimMode` for UI / convert.
     var trimMode: TrimMode { appDefaults.trimMode }
     @Published var player: AVPlayer?
+    /// Slice 5: AVPlayer only while Preview disclosure is expanded.
+    @Published private(set) var isPreviewExpanded = false
     @Published var isBatchRunning = false
     @Published var statusMessage: String = ""
     /// Last folder written by Export (for Reveal in Finder).
@@ -157,6 +159,7 @@ final class ConverterViewModel: ObservableObject {
     }
 
     func clear() {
+        isPreviewExpanded = false
         player?.pause()
         player = nil
         items = []
@@ -213,9 +216,27 @@ final class ConverterViewModel: ObservableObject {
         refreshPlayerForSelection()
     }
 
+    /// Expand/collapse Preview. Collapsed tears down AVPlayer; expand creates + seeks once.
+    func setPreviewExpanded(_ expanded: Bool) {
+        guard expanded != isPreviewExpanded else { return }
+        isPreviewExpanded = expanded
+        if expanded {
+            DropLog.log("preview expanded — create player")
+            refreshPlayerForSelection()
+        } else {
+            player?.pause()
+            player = nil
+            DropLog.log("preview collapsed — player torn down")
+        }
+    }
+
     private func refreshPlayerForSelection() {
         player?.pause()
         player = nil
+        guard isPreviewExpanded else {
+            DropLog.log("refreshPlayer: skipped (preview collapsed)")
+            return
+        }
         guard let item = selectedItem else {
             DropLog.log("refreshPlayer: no selection")
             return
@@ -227,10 +248,18 @@ final class ConverterViewModel: ObservableObject {
         // Detach from the ingest Task's immediate SwiftUI invalidation — VideoPlayer
         // was crashing after "after refreshPlayer" with no further breadcrumbs.
         DispatchQueue.main.async {
+            guard self.isPreviewExpanded else {
+                DropLog.log("refreshPlayer async attach aborted (collapsed)")
+                return
+            }
             DropLog.log("refreshPlayer async attach start itemStatus=\(playerItem.status.rawValue)")
             self.player = av
             DropLog.log("refreshPlayer player published to UI")
             DispatchQueue.main.async {
+                guard self.isPreviewExpanded, self.player === av else {
+                    DropLog.log("refreshPlayer async seek aborted")
+                    return
+                }
                 DropLog.log("refreshPlayer async seek start")
                 self.seekPlayerToKeyframe(for: item, in: av)
                 DropLog.log("refreshPlayer seek done")
@@ -686,7 +715,6 @@ struct ContentView: View {
                                     )
                                 )
                             }
-                            keyframeScrubber(for: item)
                         }
                         destinationSettings
                         actions
@@ -905,38 +933,54 @@ struct ContentView: View {
 
     @ViewBuilder
     private func previewSection(for item: QueueItem) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(item.filename)
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
-            if let player = model.player {
-                MacPlayerView(player: player)
-                    .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.08))
+        // Slice 5: collapsed by default — no MacPlayerView / AVPlayer until expand.
+        DisclosureGroup(
+            isExpanded: Binding(
+                get: { model.isPreviewExpanded },
+                set: { model.setPreviewExpanded($0) }
+            )
+        ) {
+            VStack(alignment: .leading, spacing: 8) {
+                if let player = model.player {
+                    MacPlayerView(player: player)
+                        .frame(height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.08))
+                        )
+                        .id(item.id)
+                        .onAppear { DropLog.log("MacPlayerView onAppear item=\(item.filename)") }
+                        .onDisappear { DropLog.log("MacPlayerView onDisappear item=\(item.filename)") }
+                } else {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.secondary.opacity(0.08))
+                        .frame(height: 220)
+                        .overlay(Text("Loading preview…").font(.caption).foregroundStyle(.secondary))
+                        .onAppear { DropLog.log("preview placeholder (no player yet) item=\(item.filename)") }
+                }
+                if let seg = item.segment, seg.sourceDuration > 0 {
+                    SegmentTimelineOverlay(
+                        sourceDuration: seg.sourceDuration,
+                        segmentStart: seg.start,
+                        segmentDuration: seg.duration,
+                        keyframePercent: item.keyframePercent
                     )
-                    .id(item.id)
-                    .onAppear { DropLog.log("MacPlayerView onAppear item=\(item.filename)") }
-                    .onDisappear { DropLog.log("MacPlayerView onDisappear item=\(item.filename)") }
-            } else {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.secondary.opacity(0.08))
-                    .frame(height: 220)
-                    .overlay(Text("Loading preview…").font(.caption).foregroundStyle(.secondary))
-                    .onAppear { DropLog.log("preview placeholder (no player yet) item=\(item.filename)") }
+                    Text("Blue = Live Photo window · white tick = key photo (preview seeks here)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                keyframeScrubber(for: item)
             }
-            if let seg = item.segment, seg.sourceDuration > 0 {
-                SegmentTimelineOverlay(
-                    sourceDuration: seg.sourceDuration,
-                    segmentStart: seg.start,
-                    segmentDuration: seg.duration,
-                    keyframePercent: item.keyframePercent
-                )
-                Text("Blue = Live Photo window · white tick = key photo (preview seeks here)")
-                    .font(.caption2)
+            .padding(.top, 6)
+        } label: {
+            HStack(spacing: 8) {
+                Text("Preview")
+                    .font(.subheadline.weight(.medium))
+                Text(item.filename)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
     }
