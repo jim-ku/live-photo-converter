@@ -7,14 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] — unreleased until GitHub Release
+
+First public cut. App UI base Soft OPEN tip [`8854bc1`](https://github.com/jim-ku/live-photo-converter/commit/8854bc19add18dec84898b70b7276294b7e34a71); docs + release kit land on later tip (see git history). Tag `v0.1.0` only after notarized DMG exists.
+
 ### Added
 
-- Slice A docs package: MIT `LICENSE`, user-facing README, `docs/SMOKE.md`, `docs/dev.md`, bug issue template, this changelog skeleton.
+- Soft OPEN trim UX: Custom filmstrip under trim picker before Cover; Start/Center/End blue Live Photo window without expanding Preview; Cover thumb / scrub / Set as Cover.
+- Help → How to use; Defaults vs per-clip Override; Photos album + Export folder destinations.
+- Sponsors funding YAML (`.github/FUNDING.yml`).
+- Slice A docs: MIT `LICENSE`, user README (Install → Use → Troubleshoot), `docs/SMOKE.md`, `docs/dev.md`, bug issue template, changelog.
+- Slice B prep: `docs/RELEASE.md`, `scripts/macos-release.sh`, `scripts/make-dmg.sh`, CI Debug build, marketing version `0.1.0`, release-notes draft.
 
-### Soft OPEN (tip)
+### Notes
 
-- Soft OPEN polish lands on tip [`8854bc1`](https://github.com/jim-ku/live-photo-converter/commit/8854bc19add18dec84898b70b7276294b7e34a71): Custom filmstrip under trim picker before Cover; Start/Center/End blue Live Photo window without expanding Preview; Cover thumb/scrub/Set as Cover; Help; Defaults/Override; Photos album + Export folder.
-
-## [0.1.0] — TBD
-
-Placeholder for the first public GitHub Release (notarized `.dmg`). Not cut yet.
+- Notarized DMG + GitHub Release are **not** cut until Jim Mac signs with Developer ID (Linux box cannot notarize).

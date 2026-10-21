@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  macos-debug:
+    name: xcodebuild Debug (macOS)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode
+        run: xcodebuild -version && xcodebuild -list
+
+      - name: Build Debug
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -scheme LivePhotoConverter \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath ./build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build

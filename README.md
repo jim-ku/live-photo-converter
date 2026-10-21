@@ -13,7 +13,7 @@ Mac app that turns **MP4 / MOV / M4V** clips into Apple **Live Photos** (paired 
 2. Open `LivePhotoConverter.xcodeproj` in **Xcode 15+** (macOS 13+).
 3. Scheme **LivePhotoConverter** → destination **My Mac** → Run (⌘R).
 
-Signed DMG installs via [Releases](https://github.com/jim-ku/live-photo-converter/releases) will land in a later milestone. Until then, build from source as above.
+**Binary install (when available):** download the notarized DMG from [Releases](https://github.com/jim-ku/live-photo-converter/releases) → open → drag to Applications. `v0.1.0` ships after Jim Mac notarization (see [docs/RELEASE.md](docs/RELEASE.md)). Until that asset exists, build from source as above.
 
 Optional CLI build:
 
@@ -77,6 +77,7 @@ open -R "$LOG"
 
 - [Mac smoke checklist](docs/SMOKE.md) — Soft OPEN gate on tip
 - [Developer notes](docs/dev.md) — Photos API, metadata, eng/QA notes
+- [Release runbook](docs/RELEASE.md) — maintainers: Developer ID → notarytool → DMG → `gh release`
 - [Changelog](CHANGELOG.md)
 
 ## Sponsors
