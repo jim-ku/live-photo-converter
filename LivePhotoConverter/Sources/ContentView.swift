@@ -82,6 +82,17 @@ final class ConverterViewModel: ObservableObject {
     @Published var exportDirectory: URL?
     @Published var exportFolderDisplay: String = "Not set — choose a folder"
 
+    /// Dropped / picked roots we called startAccessingSecurityScopedResource on.
+    private var scopedRoots: [URL] = []
+
+    private static var ingestDirectory: URL {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let dir = base.appendingPathComponent("LivePhotoConverterIngest", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     var selectedItem: QueueItem? {
         guard let selectedID else { return items.first }
         return items.first { $0.id == selectedID }
@@ -108,7 +119,35 @@ final class ConverterViewModel: ObservableObject {
         lastExportDirectory = nil
         lastSavedToPhotos = false
         cancelRequested = false
+        releaseScopedRoots()
         // Keep album name + export folder (user destinations)
+    }
+
+    private func retainScopedRoot(_ url: URL) {
+        if url.startAccessingSecurityScopedResource() {
+            scopedRoots.append(url)
+        }
+    }
+
+    private func releaseScopedRoots() {
+        for url in scopedRoots {
+            url.stopAccessingSecurityScopedResource()
+        }
+        scopedRoots.removeAll()
+    }
+
+    /// Copy into the app sandbox cache so AVFoundation never touches a bare drop URL.
+    private static func copyIntoIngestCache(_ url: URL) throws -> URL {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing { url.stopAccessingSecurityScopedResource() }
+        }
+        let dest = ingestDirectory.appendingPathComponent("\(UUID().uuidString)-\(url.lastPathComponent)")
+        if FileManager.default.fileExists(atPath: dest.path) {
+            try FileManager.default.removeItem(at: dest)
+        }
+        try FileManager.default.copyItem(at: url, to: dest)
+        return dest
     }
 
     func recomputeSegments() {
@@ -143,28 +182,38 @@ final class ConverterViewModel: ObservableObject {
     func seekPlayerToKeyframe(for item: QueueItem, in av: AVPlayer? = nil) {
         guard let seg = item.segment else { return }
         let target = seg.start + seg.duration * item.keyframePercent
-        let time = CMTime(seconds: max(0, target), preferredTimescale: 600)
+        guard target.isFinite, target >= 0 else { return }
+        let time = CMTime(seconds: target, preferredTimescale: 600)
+        guard time.isValid, !time.isIndefinite else { return }
         (av ?? player)?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
     func loadURLs(_ urls: [URL]) {
+        for root in urls {
+            retainScopedRoot(root)
+        }
         let videos = LivePhotoEngine.collectVideos(from: urls)
         guard !videos.isEmpty else {
             statusMessage = "No MP4/MOV/M4V files found."
             return
         }
-        let existing = Set(items.map { $0.url.resolvingSymlinksInPath().path })
-        let fresh = videos.filter { !existing.contains($0.resolvingSymlinksInPath().path) }
+        // Dedupe by original filename+size when possible; after ingest paths differ.
+        let existingNames = Set(items.map { $0.filename.lowercased() })
+        let fresh = videos.filter { !existingNames.contains($0.lastPathComponent.lowercased()) }
         guard !fresh.isEmpty else {
             statusMessage = "Those files are already in the queue."
             return
         }
-        Task {
+        Task { @MainActor in
             var built: [QueueItem] = []
             for url in fresh {
                 let defaultCustom = CustomTrimTemplate.default
                 do {
-                    let d = try await LivePhotoEngine.loadDuration(of: url)
+                    let local = try Self.copyIntoIngestCache(url)
+                    let d = try await LivePhotoEngine.loadDuration(of: local)
+                    guard d.isFinite, d >= 0 else {
+                        throw LivePhotoEngineError.cannotCreateReader
+                    }
                     let seg = LivePhotoEngine.plannedSegment(
                         sourceDuration: d,
                         mode: trimMode,
@@ -172,7 +221,7 @@ final class ConverterViewModel: ObservableObject {
                     )
                     built.append(QueueItem(
                         id: UUID(),
-                        url: url,
+                        url: local,
                         duration: d,
                         segment: seg,
                         customTrim: defaultCustom,
@@ -198,7 +247,7 @@ final class ConverterViewModel: ObservableObject {
             let wasEmpty = items.isEmpty
             items.append(contentsOf: built)
             if wasEmpty || selectedID == nil {
-                selectedID = built.first?.id
+                selectedID = built.first(where: { $0.duration > 0 })?.id ?? built.first?.id
             }
             refreshPlayerForSelection()
             let skipped = videos.count - fresh.count
