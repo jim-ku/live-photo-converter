@@ -68,6 +68,10 @@ final class ConverterViewModel: ObservableObject {
     @Published var lastExportDirectory: URL?
     /// True after a successful Photos batch (for Open Photos).
     @Published var lastSavedToPhotos = false
+    /// Set by Cancel; checked between queue items (in-flight item may finish).
+    @Published private(set) var cancelRequested = false
+    /// Last batch destination — used by Retry failed.
+    private var lastBatchWasPhotos = true
 
     /// Photos album title — default “Live Photo Converter”; persisted in UserDefaults.
     @Published var albumName: String = UserDefaults.standard.string(forKey: ConverterViewModel.albumNameKey) ?? "Live Photo Converter" {
@@ -103,6 +107,7 @@ final class ConverterViewModel: ObservableObject {
         statusMessage = ""
         lastExportDirectory = nil
         lastSavedToPhotos = false
+        cancelRequested = false
         // Keep album name + export folder (user destinations)
     }
 
@@ -331,6 +336,36 @@ final class ConverterViewModel: ObservableObject {
         runBatch(saveToPhotos: false)
     }
 
+    /// Reset only `.failed` items (readable clips) to pending and re-run the last batch mode.
+    func retryFailed() {
+        guard !isBatchRunning else { return }
+        var reset = 0
+        for i in items.indices {
+            if case .failed = items[i].status, items[i].duration > 0 {
+                items[i].status = .pending
+                items[i].progress = 0
+                reset += 1
+            }
+        }
+        guard reset > 0 else {
+            statusMessage = "No failed items to retry."
+            return
+        }
+        statusMessage = "Retrying \(reset) failed…"
+        if lastBatchWasPhotos {
+            convertAllToPhotos()
+        } else {
+            exportAll()
+        }
+    }
+
+    /// Stop after the current item finishes. Remaining stay pending.
+    func cancelBatch() {
+        guard isBatchRunning else { return }
+        cancelRequested = true
+        statusMessage = "Canceling after current item…"
+    }
+
     private func runBatch(saveToPhotos: Bool) {
         guard !items.isEmpty, !isBatchRunning else { return }
 
@@ -340,7 +375,9 @@ final class ConverterViewModel: ObservableObject {
         }
 
         isBatchRunning = true
+        cancelRequested = false
         lastSavedToPhotos = false
+        lastBatchWasPhotos = saveToPhotos
         let albumTitle = albumName.trimmingCharacters(in: .whitespacesAndNewlines)
         statusMessage = saveToPhotos
             ? "Converting & saving to album “\(albumTitle)”…"
@@ -353,6 +390,7 @@ final class ConverterViewModel: ObservableObject {
                     album = try await LivePhotoEngine.resolveOrCreateAlbum(titled: albumTitle)
                 } catch {
                     isBatchRunning = false
+                    cancelRequested = false
                     statusMessage = error.localizedDescription
                     for i in items.indices where items[i].status == .pending {
                         items[i].status = .failed(error.localizedDescription)
@@ -361,9 +399,14 @@ final class ConverterViewModel: ObservableObject {
                 }
             }
 
+            var wasCanceled = false
             for i in items.indices {
+                if cancelRequested {
+                    wasCanceled = true
+                    break
+                }
                 if case .done = items[i].status { continue }
-                if case .failed = items[i].status, items[i].duration <= 0 { continue }
+                if case .failed = items[i].status { continue }
 
                 items[i].status = .converting
                 items[i].progress = 0
@@ -402,10 +445,18 @@ final class ConverterViewModel: ObservableObject {
             }
 
             isBatchRunning = false
+            let canceled = wasCanceled || cancelRequested
+            cancelRequested = false
             let ok = doneCount
             let bad = failedCount
             if saveToPhotos, ok > 0 { lastSavedToPhotos = true }
-            if bad == 0 {
+            if canceled {
+                let left = items.filter {
+                    if case .pending = $0.status { return true }
+                    return false
+                }.count
+                statusMessage = "Canceled: \(ok) done, \(bad) failed, \(left) left pending."
+            } else if bad == 0 {
                 statusMessage = saveToPhotos
                     ? "Saved \(ok) Live Photo\(ok == 1 ? "" : "s") to album “\(albumTitle)”."
                     : "Exported \(ok) HEIC+MOV pair\(ok == 1 ? "" : "s") to\n\(exportFolderDisplay)"
@@ -816,6 +867,27 @@ struct ContentView: View {
                   : "Writes HEIC+MOV into the folder above")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+
+            if model.isBatchRunning {
+                Button("Cancel") { model.cancelBatch() }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .disabled(model.cancelRequested)
+                    .frame(maxWidth: .infinity)
+                Text(model.cancelRequested
+                      ? "Will stop after the current item"
+                      : "Stops between items; in-flight may finish")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else if model.failedCount > 0 {
+                Button("Retry failed") { model.retryFailed() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                Text("Re-runs only Failed rows (skips Done)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

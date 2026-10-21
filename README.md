@@ -48,6 +48,7 @@ open ./build/Build/Products/Debug/LivePhotoConverter.app
 - Preview timeline shows the Live Photo window (blue) and key-photo tick; player seeks to the keyframe.
 - Queue rows show failure reasons; remove with ✕.
 - After a successful run: **Open Photos** and/or **Reveal in Finder**.
+- **Cancel** stops between queue items (in-flight may finish). **Retry failed** re-queues only Failed rows.
 
 ## Convert (single or batch)
 
