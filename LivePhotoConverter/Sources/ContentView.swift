@@ -709,6 +709,10 @@ struct ContentView: View {
                         Divider().padding(.vertical, 4)
                         trimSummary
                         if let item = model.selectedItem {
+                            // Surface Live Photo window outside collapsed Preview (smoke: trim looked gone).
+                            if let seg = item.segment, seg.sourceDuration > 0 {
+                                trimWindowSection(for: item, seg: seg)
+                            }
                             coverSection(for: item)
                             if item.duration > LivePhotoEngine.maxLiveDuration,
                                item.resolvedTrimMode(appDefaults: model.appDefaults) == .custom {
@@ -994,17 +998,7 @@ struct ContentView: View {
                         .overlay(Text("Loading preview…").font(.caption).foregroundStyle(.secondary))
                         .onAppear { DropLog.log("preview placeholder (no player yet) item=\(item.filename)") }
                 }
-                if let seg = item.segment, seg.sourceDuration > 0 {
-                    SegmentTimelineOverlay(
-                        sourceDuration: seg.sourceDuration,
-                        segmentStart: seg.start,
-                        segmentDuration: seg.duration,
-                        keyframePercent: item.keyframePercent
-                    )
-                    Text("Blue = Live Photo window · white tick = Cover image (preview seeks here)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                // Trim window lives outside this disclosure (always visible); Preview is player-only.
             }
             .padding(.top, 6)
         } label: {
@@ -1017,6 +1011,28 @@ struct ContentView: View {
                     .lineLimit(1)
             }
         }
+    }
+
+    /// Always-visible Live Photo window (Start/Center/End/Custom) — not buried in collapsed Preview.
+    private func trimWindowSection(for item: QueueItem, seg: LivePhotoSegment) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SegmentTimelineOverlay(
+                sourceDuration: seg.sourceDuration,
+                segmentStart: seg.start,
+                segmentDuration: seg.duration,
+                keyframePercent: item.keyframePercent
+            )
+            Text("Blue = Live Photo window · white tick = Cover image")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
     }
 
     /// Slice 7: Cover image row — thumb + scrubber + Set as Cover (Queue → Cover/trim → Preview).
