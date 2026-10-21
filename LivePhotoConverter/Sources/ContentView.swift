@@ -59,6 +59,16 @@ struct QueueItem: Identifiable, Equatable {
     var filename: String { url.lastPathComponent }
     var usesOverride: Bool { override != nil }
     var trimBadgeLabel: String { usesOverride ? "Override" : "Default" }
+
+    /// Effective trim mode: override wins, else app defaults.
+    func resolvedTrimMode(appDefaults: AppDefaults) -> TrimMode {
+        override?.trimMode ?? appDefaults.trimMode
+    }
+
+    /// Effective custom template: override wins, else app defaults.
+    func resolvedCustomTrim(appDefaults: AppDefaults) -> CustomTrimTemplate {
+        override?.customTrim ?? appDefaults.customTrim
+    }
 }
 
 @MainActor
@@ -329,21 +339,52 @@ final class ConverterViewModel: ObservableObject {
         statusMessage = "Log: \(DropLog.pathHint)"
     }
 
+    /// Per-clip trim mode edit → sets Override (does not touch AppDefaults).
+    func updateSelectedTrimMode(_ mode: TrimMode) {
+        guard let id = selectedID, let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        let custom = items[idx].override?.customTrim ?? items[idx].customTrim
+        applyOverride(at: idx, TrimSettings(trimMode: mode, customTrim: custom))
+    }
+
+    /// Per-clip custom window edit → Override with Custom mode (Defaults page untouched).
     func updateCustom(start: TimeInterval, length: TimeInterval) {
         guard let id = selectedID, let idx = items.firstIndex(where: { $0.id == id }) else { return }
-        // Per-clip custom window for Default items while app mode is Custom.
-        // Does not mutate AppDefaults (Defaults page owns that). Override wiring = slice 3.
-        items[idx].customTrim = CustomTrimTemplate(startOffset: start, windowLength: length)
-        items[idx].segment = LivePhotoEngine.plannedSegment(
-            sourceDuration: items[idx].duration,
-            mode: appDefaults.trimMode == .custom ? .custom : appDefaults.trimMode,
-            custom: items[idx].customTrim
-        )
+        let custom = CustomTrimTemplate(startOffset: start, windowLength: length)
+        applyOverride(at: idx, TrimSettings(trimMode: .custom, customTrim: custom))
+    }
+
+    /// Clear override → Default badge; recompute from current AppDefaults.
+    func resetOverride(for id: UUID) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        items[idx].override = nil
+        items[idx].customTrim = appDefaults.customTrim
+        recomputeSegment(at: idx, mode: appDefaults.trimMode, custom: appDefaults.customTrim)
         seekPlayerToKeyframe(for: items[idx])
+    }
+
+    private func applyOverride(at idx: Int, _ settings: TrimSettings) {
+        items[idx].override = settings
+        items[idx].customTrim = settings.customTrim
+        recomputeSegment(at: idx, mode: settings.trimMode, custom: settings.customTrim)
+        seekPlayerToKeyframe(for: items[idx])
+    }
+
+    private func recomputeSegment(at idx: Int, mode: TrimMode, custom: CustomTrimTemplate) {
+        let d = items[idx].duration
+        guard d > 0 else {
+            items[idx].segment = nil
+            return
+        }
+        items[idx].segment = LivePhotoEngine.plannedSegment(
+            sourceDuration: d,
+            mode: mode,
+            custom: custom
+        )
     }
 
     func updateKeyframe(_ percent: Double) {
         guard let id = selectedID, let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        // Keyframe is always per-clip; does not flip Default/Override (trim-only badge).
         items[idx].keyframePercent = percent
         seekPlayerToKeyframe(for: items[idx])
     }
@@ -534,10 +575,12 @@ final class ConverterViewModel: ObservableObject {
                 refreshPlayerForSelection()
 
                 do {
+                    let mode = items[i].resolvedTrimMode(appDefaults: appDefaults)
+                    let custom = items[i].resolvedCustomTrim(appDefaults: appDefaults)
                     let pair = try await LivePhotoEngine.convert(
                         videoURL: items[i].url,
-                        mode: appDefaults.trimMode,
-                        custom: items[i].customTrim,
+                        mode: mode,
+                        custom: custom,
                         keyframePercent: items[i].keyframePercent
                     ) { [weak self] p in
                         Task { @MainActor in
@@ -615,16 +658,31 @@ struct ContentView: View {
                         trimSummary
                         if let item = model.selectedItem {
                             previewSection(for: item)
-                            if item.duration > LivePhotoEngine.maxLiveDuration, model.trimMode == .custom {
+                            if item.duration > LivePhotoEngine.maxLiveDuration,
+                               item.resolvedTrimMode(appDefaults: model.appDefaults) == .custom {
                                 CustomTrimView(
                                     duration: item.duration,
                                     start: Binding(
-                                        get: { item.customTrim.startOffset },
-                                        set: { model.updateCustom(start: $0, length: item.customTrim.windowLength) }
+                                        get: {
+                                            (model.selectedItem ?? item)
+                                                .resolvedCustomTrim(appDefaults: model.appDefaults).startOffset
+                                        },
+                                        set: { newStart in
+                                            let cur = (model.selectedItem ?? item)
+                                                .resolvedCustomTrim(appDefaults: model.appDefaults)
+                                            model.updateCustom(start: newStart, length: cur.windowLength)
+                                        }
                                     ),
                                     windowLength: Binding(
-                                        get: { item.customTrim.windowLength },
-                                        set: { model.updateCustom(start: item.customTrim.startOffset, length: $0) }
+                                        get: {
+                                            (model.selectedItem ?? item)
+                                                .resolvedCustomTrim(appDefaults: model.appDefaults).windowLength
+                                        },
+                                        set: { newLen in
+                                            let cur = (model.selectedItem ?? item)
+                                                .resolvedCustomTrim(appDefaults: model.appDefaults)
+                                            model.updateCustom(start: cur.startOffset, length: newLen)
+                                        }
                                     )
                                 )
                             }
@@ -758,14 +816,14 @@ struct ContentView: View {
         }
     }
 
-    /// Read-only trim summary on convert screen; mode picker lives in Defaults.
+    /// App default caption + per-clip trim (Override) + Reset.
     private var trimSummary: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Trim")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text("Default: \(model.appDefaults.trimMode.rawValue)")
+                Text("App default: \(model.appDefaults.trimMode.rawValue)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("Defaults…") { showingDefaults = true }
@@ -773,11 +831,50 @@ struct ContentView: View {
                     .disabled(model.isBatchRunning)
             }
 
-            Text(model.trimMode == .custom
-                  ? "Custom template from Defaults; edit selected clip window below. Clips ≤3s keep full length."
-                  : "Start / Center / End from Defaults apply to Default-badge clips. Clips ≤3s keep full length.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if let item = model.selectedItem {
+                HStack(alignment: .center, spacing: 10) {
+                    Text("This clip")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Picker(
+                        "Clip trim",
+                        selection: Binding(
+                            get: {
+                                (model.selectedItem ?? item)
+                                    .resolvedTrimMode(appDefaults: model.appDefaults)
+                            },
+                            set: { model.updateSelectedTrimMode($0) }
+                        )
+                    ) {
+                        ForEach(TrimMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .disabled(model.isBatchRunning || item.duration <= 0)
+
+                    if item.usesOverride {
+                        Button("Reset") {
+                            model.resetOverride(for: item.id)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(model.isBatchRunning)
+                        .help("Clear override; use current app Defaults")
+                    }
+                }
+
+                Text(item.usesOverride
+                      ? "Override — Reset restores app Defaults for this clip only."
+                      : "Default — editing mode or custom window sets Override. Clips ≤3s keep full length.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Select a clip to edit per-clip trim. App Defaults apply to Default-badge clips.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             if let seg = model.selectedItem?.segment {
                 HStack(alignment: .top, spacing: 10) {
@@ -1500,7 +1597,7 @@ struct DefaultsView: View {
                     .pickerStyle(.segmented)
                     .disabled(model.isBatchRunning)
 
-                    Text("Applies to new drops and existing Default-badge clips. Override clips (slice 3) stay untouched.")
+                    Text("Applies to new drops and existing Default-badge clips. Override clips stay untouched.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } header: {
