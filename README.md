@@ -28,56 +28,48 @@ Mac app that turns **MP4 / MOV / M4V** clips into Apple **Live Photos** (paired 
 
 Key photo defaults to the middle of the selected segment.
 
-## Build & run (Mac)
+## Build
 
-1. Clone / pull latest `main`:
+1. Pull latest `main` (required before filing logs — path/format change with the binary):
    ```bash
-   git clone https://github.com/jim-ku/live-photo-converter.git
-   cd live-photo-converter
-   git pull
-   git rev-parse --short HEAD   # note this SHA for QA
+   git clone https://github.com/jim-ku/live-photo-converter.git   # first time
+   cd live-photo-converter && git pull
+   git rev-parse --short HEAD   # note SHA for QA
    ```
-2. Open `LivePhotoConverter.xcodeproj` in **Xcode 15+**.
-3. Scheme **LivePhotoConverter** → destination **My Mac** → Run (⌘R).
-4. Grant **Photos** access (read/write) when saving to an album.
+2. Open `LivePhotoConverter.xcodeproj` in **Xcode 15+** (macOS 13+).
+3. Scheme **LivePhotoConverter** → **My Mac**.
 
-Or from the CLI:
+Optional CLI:
 
 ```bash
-cd /path/to/live-photo-converter
 xcodebuild -scheme LivePhotoConverter -configuration Debug \
   -derivedDataPath ./build build
 open ./build/Build/Products/Debug/LivePhotoConverter.app
 ```
 
-## Diagnostics / crash logs
+## Run
 
-Drop/ingest steps write a **crash-surviving** append log (flushed after every line).
+1. Run (⌘R).
+2. Drop **MP4 / MOV / M4V** (or a folder), or use **Choose files…** / **Choose folder…** (queue appends).
+3. Grant **Photos** read/write when using **Convert & Save to Photos**.
+
+## Debug logs
+
+Crash-surviving breadcrumbs (flush after every line). **Pull latest `main` and rebuild** before using these paths.
 
 | What | Where |
 |------|--------|
 | Main log | `~/Library/Application Support/LivePhotoConverter/debug.log` |
-| Last line only | `~/Library/Application Support/LivePhotoConverter/last-breadcrumb.txt` |
-| In-app | **Reveal log** (selects `debug.log` in Finder) |
-| Console.app | Predicate: `subsystem:com.jim.LivePhotoConverter` (category `drop`) |
-
-On launch the log starts a session line like:
-
-`—— session —— v1.0 (…) bundle=com.jim.LivePhotoConverter rev=<sourceRevision>`
-
-After a crash (or a failed drop):
-
-1. Relaunch if needed → click **Reveal log**, **or** open the path above in Finder / Terminal.
-2. Paste the **last ~30 lines** into Software Team chat (include the session line so we know the build).
-3. Say whether **Choose files…** also crashes, or only **drag**.
+| Last line | `~/Library/Application Support/LivePhotoConverter/last-breadcrumb.txt` |
+| In-app | **Reveal log** |
+| Console.app | `subsystem:com.jim.LivePhotoConverter` |
 
 ```bash
-# Terminal quick peek
 tail -n 40 ~/Library/Application\ Support/LivePhotoConverter/debug.log
 open -R ~/Library/Application\ Support/LivePhotoConverter/debug.log
 ```
 
-**Note:** Older builds (`93a5116`) wrote to `~/Library/Logs/LivePhotoConverter/drop.log`. Current `main` uses Application Support `debug.log` only — pull + rebuild before filing a log.
+After a crash: paste the last ~30 lines (include the `—— session ——` line) and note whether **Choose files…** also fails or only drag.
 
 ## UX notes (Software Team slices)
 
