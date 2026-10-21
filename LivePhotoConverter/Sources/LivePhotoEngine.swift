@@ -45,13 +45,48 @@ enum TrimMode: String, CaseIterable, Identifiable, Codable {
 }
 
 /// Template for Custom mode, applied per clip (clamped to each duration).
-struct CustomTrimTemplate: Equatable {
+struct CustomTrimTemplate: Equatable, Codable {
     /// Preferred window start offset from clip start (seconds).
     var startOffset: TimeInterval
     /// Preferred window length (0.5…3s).
     var windowLength: TimeInterval
 
     static let `default` = CustomTrimTemplate(startOffset: 0, windowLength: 3.0)
+}
+
+/// Persisted app-wide trim defaults (UserDefaults). Per-clip override is `QueueItem.override` (slice 3).
+struct AppDefaults: Equatable {
+    var trimMode: TrimMode
+    var customTrim: CustomTrimTemplate
+
+    static let `default` = AppDefaults(trimMode: .center3s, customTrim: .default)
+
+    private static let trimModeKey = "appDefaults.trimMode"
+    private static let customStartKey = "appDefaults.customStartOffset"
+    private static let customLengthKey = "appDefaults.customWindowLength"
+
+    static func load() -> AppDefaults {
+        let ud = UserDefaults.standard
+        let mode: TrimMode
+        if let raw = ud.string(forKey: trimModeKey), let parsed = TrimMode(rawValue: raw) {
+            mode = parsed
+        } else {
+            mode = .center3s
+        }
+        let start = (ud.object(forKey: customStartKey) as? Double) ?? CustomTrimTemplate.default.startOffset
+        let length = (ud.object(forKey: customLengthKey) as? Double) ?? CustomTrimTemplate.default.windowLength
+        return AppDefaults(
+            trimMode: mode,
+            customTrim: CustomTrimTemplate(startOffset: start, windowLength: length)
+        )
+    }
+
+    func save() {
+        let ud = UserDefaults.standard
+        ud.set(trimMode.rawValue, forKey: Self.trimModeKey)
+        ud.set(customTrim.startOffset, forKey: Self.customStartKey)
+        ud.set(customTrim.windowLength, forKey: Self.customLengthKey)
+    }
 }
 
 struct LivePhotoPair: Equatable {

@@ -69,8 +69,10 @@ final class ConverterViewModel: ObservableObject {
 
     @Published var items: [QueueItem] = []
     @Published var selectedID: UUID?
-    /// Global Start/Center/End/Custom mode (Custom values live per QueueItem).
-    @Published var trimMode: TrimMode = .center3s
+    /// App-wide defaults (UserDefaults). Edits go through `updateAppDefaults`.
+    @Published private(set) var appDefaults: AppDefaults = .load()
+    /// Convenience mirror of `appDefaults.trimMode` for UI / convert.
+    var trimMode: TrimMode { appDefaults.trimMode }
     @Published var player: AVPlayer?
     @Published var isBatchRunning = false
     @Published var statusMessage: String = ""
@@ -117,6 +119,31 @@ final class ConverterViewModel: ObservableObject {
 
     init() {
         restoreExportFolder()
+        // appDefaults already loaded via property initializer
+    }
+
+    /// Defaults UI only — persist + recompute Default (override == nil) items.
+    func updateAppDefaults(_ next: AppDefaults) {
+        guard next != appDefaults else { return }
+        appDefaults = next
+        appDefaults.save()
+        applyDefaultsToDefaultItems()
+    }
+
+    /// Recompute segments for items that inherit defaults; leave override payloads untouched.
+    func applyDefaultsToDefaultItems() {
+        for i in items.indices {
+            guard items[i].override == nil else { continue }
+            items[i].customTrim = appDefaults.customTrim
+            let d = items[i].duration
+            guard d > 0 else { continue }
+            items[i].segment = LivePhotoEngine.plannedSegment(
+                sourceDuration: d,
+                mode: appDefaults.trimMode,
+                custom: items[i].customTrim
+            )
+        }
+        refreshPlayerForSelection()
     }
 
     func clear() {
@@ -168,15 +195,7 @@ final class ConverterViewModel: ObservableObject {
     }
 
     func recomputeSegments() {
-        for i in items.indices {
-            let d = items[i].duration
-            items[i].segment = LivePhotoEngine.plannedSegment(
-                sourceDuration: d,
-                mode: trimMode,
-                custom: items[i].customTrim
-            )
-        }
-        refreshPlayerForSelection()
+        applyDefaultsToDefaultItems()
     }
 
     func select(_ id: UUID) {
@@ -244,7 +263,7 @@ final class ConverterViewModel: ObservableObject {
             DropLog.log("ingest Task started fresh=\(fresh.count)")
             var built: [QueueItem] = []
             for url in fresh {
-                let defaultCustom = CustomTrimTemplate.default
+                let defaultCustom = appDefaults.customTrim
                 do {
                     DropLog.log("ingest item \(url.lastPathComponent)")
                     let local = try Self.copyIntoIngestCache(url)
@@ -256,7 +275,7 @@ final class ConverterViewModel: ObservableObject {
                     }
                     let seg = LivePhotoEngine.plannedSegment(
                         sourceDuration: d,
-                        mode: trimMode,
+                        mode: appDefaults.trimMode,
                         custom: defaultCustom
                     )
                     built.append(QueueItem(
@@ -312,11 +331,12 @@ final class ConverterViewModel: ObservableObject {
 
     func updateCustom(start: TimeInterval, length: TimeInterval) {
         guard let id = selectedID, let idx = items.firstIndex(where: { $0.id == id }) else { return }
-        if trimMode != .custom { trimMode = .custom }
+        // Per-clip custom window for Default items while app mode is Custom.
+        // Does not mutate AppDefaults (Defaults page owns that). Override wiring = slice 3.
         items[idx].customTrim = CustomTrimTemplate(startOffset: start, windowLength: length)
         items[idx].segment = LivePhotoEngine.plannedSegment(
             sourceDuration: items[idx].duration,
-            mode: .custom,
+            mode: appDefaults.trimMode == .custom ? .custom : appDefaults.trimMode,
             custom: items[idx].customTrim
         )
         seekPlayerToKeyframe(for: items[idx])
@@ -516,7 +536,7 @@ final class ConverterViewModel: ObservableObject {
                 do {
                     let pair = try await LivePhotoEngine.convert(
                         videoURL: items[i].url,
-                        mode: trimMode,
+                        mode: appDefaults.trimMode,
                         custom: items[i].customTrim,
                         keyframePercent: items[i].keyframePercent
                     ) { [weak self] p in
@@ -573,6 +593,7 @@ struct ContentView: View {
 
     @StateObject private var model = ConverterViewModel()
     @State private var isDropTargeted = false
+    @State private var showingDefaults = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -580,14 +601,18 @@ struct ContentView: View {
             Divider()
             ScrollView {
                 VStack(spacing: 18) {
-                    dropZone
-                    if model.items.isEmpty, !model.statusMessage.isEmpty {
-                        statusBlock
-                    }
-                    if !model.items.isEmpty {
+                    if model.items.isEmpty {
+                        // Slice 2: big dashed drop CTA only when queue empty
+                        dropZone
+                        if !model.statusMessage.isEmpty {
+                            statusBlock
+                        }
+                    } else {
+                        // Queue stays first when populated (slice 1 layout)
                         queueList
+                        thinAppendBar
                         Divider().padding(.vertical, 4)
-                        trimSettings
+                        trimSummary
                         if let item = model.selectedItem {
                             previewSection(for: item)
                             if item.duration > LivePhotoEngine.maxLiveDuration, model.trimMode == .custom {
@@ -618,7 +643,9 @@ struct ContentView: View {
         .onAppear {
             model.statusMessage = "Log: \(DropLog.pathHint)"
         }
-        .onChange(of: model.trimMode) { _ in model.recomputeSegments() }
+        .sheet(isPresented: $showingDefaults) {
+            DefaultsView(model: model)
+        }
     }
 
     private var header: some View {
@@ -634,6 +661,9 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button("Defaults") { showingDefaults = true }
+                .buttonStyle(.borderless)
+                .help("App trim defaults (Start / Center / End / Custom)")
             Button("Reveal log") { model.revealDropLog() }
                 .buttonStyle(.borderless)
                 .help(DropLog.pathHint)
@@ -654,12 +684,11 @@ struct ContentView: View {
         .padding(.vertical, 14)
     }
 
+    /// Big dashed drop CTA — empty queue only (slice 2 tuck).
     private var dropZone: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(
-                    style: StrokeStyle(lineWidth: 2, dash: model.items.isEmpty ? [8, 6] : [])
-                )
+                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
                 .foregroundStyle(isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.35))
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -667,55 +696,86 @@ struct ContentView: View {
                 )
 
             VStack(spacing: 12) {
-                Image(systemName: model.items.isEmpty ? "folder.badge.plus" : "checkmark.circle.fill")
+                Image(systemName: "folder.badge.plus")
                     .font(.system(size: 34))
-                    .foregroundStyle(model.items.isEmpty ? Color.secondary : Color.green)
-                if model.items.isEmpty {
-                    Text("Drop MP4s or a folder")
-                        .font(.title3.weight(.semibold))
-                    Text("Live Photos use up to 3s. Clips shorter than 3s keep full length. Longer clips use Start / Center / End / Custom trim. Batch supported.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 400)
-                    HStack(spacing: 10) {
-                        Button("Choose files…") { pickFiles() }
-                            .buttonStyle(.borderedProminent)
-                        Button("Choose folder…") { pickFolder() }
-                            .buttonStyle(.bordered)
-                    }
-                    .padding(.top, 4)
-                } else {
-                    Text("\(model.items.count) video\(model.items.count == 1 ? "" : "s") in queue")
-                        .font(.headline)
-                    Text("Drop more to append (duplicates skipped)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
+                Text("Drop MP4s or a folder")
+                    .font(.title3.weight(.semibold))
+                Text("Live Photos use up to 3s. Clips shorter than 3s keep full length. Longer clips use Start / Center / End / Custom trim (Defaults). Batch supported.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 400)
+                HStack(spacing: 10) {
+                    Button("Choose files…") { pickFiles() }
+                        .buttonStyle(.borderedProminent)
+                    Button("Choose folder…") { pickFolder() }
+                        .buttonStyle(.bordered)
                 }
+                .padding(.top, 4)
             }
             .padding(28)
         }
-        .frame(minHeight: model.items.isEmpty ? 220 : 110)
+        .frame(minHeight: 220)
         .onDrop(of: [UTType.fileURL, UTType.movie, UTType.mpeg4Movie, UTType.folder], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
     }
 
-    private var trimSettings: some View {
+    /// Thin append affordance under queue — not a permanent block above queue.
+    private var thinAppendBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "plus.circle")
+                .foregroundStyle(.secondary)
+            Text(isDropTargeted ? "Drop to append…" : "Drop more to append")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            Button("Add files…") { pickFiles() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(model.isBatchRunning)
+            Button("Add folder…") { pickFolder() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(model.isBatchRunning)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(
+                    style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                )
+                .foregroundStyle(isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.3))
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isDropTargeted ? Color.accentColor.opacity(0.08) : Color.clear)
+                )
+        )
+        .onDrop(of: [UTType.fileURL, UTType.movie, UTType.mpeg4Movie, UTType.folder], isTargeted: $isDropTargeted) { providers in
+            handleDrop(providers)
+        }
+    }
+
+    /// Read-only trim summary on convert screen; mode picker lives in Defaults.
+    private var trimSummary: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Trim mode (for clips longer than 3s)")
-                .font(.subheadline.weight(.semibold))
-            Picker("Trim mode", selection: $model.trimMode) {
-                ForEach(TrimMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
+            HStack {
+                Text("Trim")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("Default: \(model.appDefaults.trimMode.rawValue)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Defaults…") { showingDefaults = true }
+                    .buttonStyle(.borderless)
+                    .disabled(model.isBatchRunning)
             }
-            .pickerStyle(.segmented)
-            .disabled(model.isBatchRunning)
 
             Text(model.trimMode == .custom
-                  ? "Custom window + key photo are per clip (edit the selected row). Clips ≤3s keep full length."
-                  : "Start / Center / End apply to every clip. Clips ≤3s always keep full length.")
+                  ? "Custom template from Defaults; edit selected clip window below. Clips ≤3s keep full length."
+                  : "Start / Center / End from Defaults apply to Default-badge clips. Clips ≤3s keep full length.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -1408,6 +1468,121 @@ struct TimelineTrimBar: View {
         case .none:
             break
         }
+    }
+}
+
+// MARK: - Defaults (slice 2)
+
+struct DefaultsView: View {
+    @ObservedObject var model: ConverterViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Defaults")
+                    .font(.title2.weight(.semibold))
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(20)
+
+            Divider()
+
+            Form {
+                Section {
+                    Picker("Trim mode", selection: trimModeBinding) {
+                        ForEach(TrimMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(model.isBatchRunning)
+
+                    Text("Applies to new drops and existing Default-badge clips. Override clips (slice 3) stay untouched.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Trim mode (clips longer than 3s)")
+                }
+
+                if model.appDefaults.trimMode == .custom {
+                    Section {
+                        HStack {
+                            Text("Start offset")
+                            Spacer()
+                            TextField(
+                                "sec",
+                                value: customStartBinding,
+                                format: .number.precision(.fractionLength(1))
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 72)
+                            Text("s")
+                                .foregroundStyle(.secondary)
+                        }
+                        HStack {
+                            Text("Window length")
+                            Spacer()
+                            TextField(
+                                "sec",
+                                value: customLengthBinding,
+                                format: .number.precision(.fractionLength(1))
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 72)
+                            Text("s")
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("Template for Custom mode (0.5…3s). Clamped per clip on ingest / recompute.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } header: {
+                        Text("Custom template")
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .padding(.bottom, 12)
+        }
+        .frame(minWidth: 420, minHeight: 320)
+    }
+
+    private var trimModeBinding: Binding<TrimMode> {
+        Binding(
+            get: { model.appDefaults.trimMode },
+            set: { mode in
+                var next = model.appDefaults
+                next.trimMode = mode
+                model.updateAppDefaults(next)
+            }
+        )
+    }
+
+    private var customStartBinding: Binding<Double> {
+        Binding(
+            get: { model.appDefaults.customTrim.startOffset },
+            set: { start in
+                var next = model.appDefaults
+                next.customTrim.startOffset = max(0, start)
+                model.updateAppDefaults(next)
+            }
+        )
+    }
+
+    private var customLengthBinding: Binding<Double> {
+        Binding(
+            get: { model.appDefaults.customTrim.windowLength },
+            set: { length in
+                var next = model.appDefaults
+                next.customTrim.windowLength = min(
+                    max(length, LivePhotoEngine.minCustomWindow),
+                    LivePhotoEngine.maxLiveDuration
+                )
+                model.updateAppDefaults(next)
+            }
+        )
     }
 }
 
