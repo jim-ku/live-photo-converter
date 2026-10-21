@@ -2,44 +2,20 @@
 
 Mac app that turns **MP4 / MOV / M4V** clips into Apple **Live Photos** (paired **HEIC** still + **MOV** sharing one asset UUID).
 
-## Destinations (explicit)
+## Install
 
-| Action | Where it goes |
-|--------|----------------|
-| **Convert & Save to Photos** | A **custom album** you name (default: `Live Photo Converter`). The album is created if it does not exist; every successful convert in the batch is added to that album. |
-| **Export pairs to folder** | A folder you choose with **Export folder…**. HEIC+MOV pairs are written **flat** into that folder with unique names (`LivePhoto-<id>.HEIC` / `.MOV`). The path is remembered (UserDefaults + security-scoped bookmark). |
-
-**Previous gap:** Export already used a folder picker at run time, but the path was not a persistent setting. Photos save added assets to the **library root with no album**. Both are now explicit controls in the **Destinations** section.
-
-### Photos album API path
-
-1. `PHPhotoLibrary.requestAuthorization(for: .readWrite)`
-2. `PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, …)` filtered by `title`
-3. If missing: `PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle:)`
-4. Per asset: `PHAssetCreationRequest.forAsset()` (HEIC `.photo` + MOV `.pairedVideo`) then `PHAssetCollectionChangeRequest(for: album).addAssets([placeholder])`
-
-## Duration & trim rules
-
-| Source length | Behavior |
-|---------------|----------|
-| **≤ 3s** | Keep the **full original** clip (no pad / no loop). |
-| **&lt; 1.5s** | Still keep full length; soft warning that Photos may not treat it as ideal Live Photo length. |
-| **&gt; 3s** | **Start 3s** / **Center 3s** / **End 3s** / **Custom** sliding window (0.5–3s). |
-
-Cover image defaults to the middle of the selected segment.
-
-## Build
-
-1. Pull latest `main` (required before filing logs — path/format change with the binary):
+1. Clone or pull this repo:
    ```bash
-   git clone https://github.com/jim-ku/live-photo-converter.git   # first time
+   git clone https://github.com/jim-ku/live-photo-converter.git
    cd live-photo-converter && git pull
-   git rev-parse --short HEAD   # note SHA for QA
+   git rev-parse --short HEAD   # note the tip SHA for smoke / bug reports
    ```
 2. Open `LivePhotoConverter.xcodeproj` in **Xcode 15+** (macOS 13+).
-3. Scheme **LivePhotoConverter** → **My Mac**.
+3. Scheme **LivePhotoConverter** → destination **My Mac** → Run (⌘R).
 
-Optional CLI:
+Signed DMG installs via [Releases](https://github.com/jim-ku/live-photo-converter/releases) will land in a later milestone. Until then, build from source as above.
+
+Optional CLI build:
 
 ```bash
 xcodebuild -scheme LivePhotoConverter -configuration Debug \
@@ -47,76 +23,49 @@ xcodebuild -scheme LivePhotoConverter -configuration Debug \
 open ./build/Build/Products/Debug/LivePhotoConverter.app
 ```
 
-## Run
+## Use
 
-1. Run (⌘R).
-2. Drop **MP4 / MOV / M4V** (or a folder), or use **Choose files…** / **Choose folder…** (queue appends).
-3. Grant **Photos** read/write when using **Convert & Save to Photos**.
+Matches in-app **Help → How to use**:
 
-## Debug logs
+1. **Drop or append** — Drop MP4/MOV/M4V files or a folder onto the dashed area. With a queue open, use the thin bar under Queue, or **Add files** / **Add folder**.
+2. **Defaults vs Override** — **Defaults** (toolbar) set the app trim for new drops and Default-badge clips. Editing **This clip**’s mode or custom window sets **Override** for that clip only; **Reset** clears it.
+3. **Trim (clips longer than 3s)** — Choose **Start 3s** / **Center 3s** / **End 3s** / **Custom**. Clips **≤ 3s** keep the full original (no pad / no loop). Soft warning if under ~1.5s.
+4. **Custom filmstrip** — In Custom mode: drag the blue window to move; pull L/R handles to set length (max 3s). Inline preview above the strip seeks with the active edge. Preview Disclosure stays collapsed until you open it. Start/Center/End show the blue Live Photo window without expanding Preview and without a filmstrip.
+5. **Cover image** — Still frame for the Live Photo (this clip only). Drag the scrubber, or expand Preview and scrub the player, then tap **Set as Cover**. Does not change Default/Override.
+6. **Preview** — Starts collapsed (no player until you expand). Collapse tears the player down. Switching clips while collapsed stays quiet.
+7. **Export / Photos** — Under **Destinations**, set **Photos album** name and/or **Export folder…**. Then **Convert & Save to Photos** (named album) or **Export pairs to folder** (flat `LivePhoto-<id>.HEIC` / `.MOV`). Import tip for exports: select each HEIC+MOV pair **together** in Photos.
+8. **Reveal log** — Toolbar **Reveal log** opens the debug log in Finder if something fails.
 
-App Sandbox remaps Application Support into the **container**. The host path
-`~/Library/Application Support/LivePhotoConverter/…` will **not** exist.
+After a successful run: **Open Photos** and/or **Reveal in Finder**. **Cancel** stops between queue items. **Retry failed** re-queues only Failed rows.
 
-| What | Where |
-|------|--------|
-| Main log | `~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application Support/LivePhotoConverter/debug.log` |
-| Last line | `…/last-breadcrumb.txt` (same folder) |
-| In-app | **Reveal log** (always in the header — prefers this) |
-| Console.app | `subsystem:com.jim.LivePhotoConverter` |
+## Troubleshoot
 
-```bash
-# After ⌘R at least once (creates the file on launch):
-LOG=~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application\ Support/LivePhotoConverter/debug.log
-ls -la "$LOG"
-tail -n 40 "$LOG"
-open -R "$LOG"
+| Symptom | What to try |
+|---------|-------------|
+| Photos permission denied | Grant **Photos** read/write when prompted (System Settings → Privacy & Security → Photos). |
+| “No such file” for the log | Launch the app once (⌘R) so the container path is created, then **Reveal log**. |
+| Convert fails / crash | Note tip SHA (`git rev-parse --short HEAD`), copy last ~30 log lines (include `—— session ——`), and file a [bug report](https://github.com/jim-ku/live-photo-converter/issues/new?template=bug.yml). |
+| Export folder won’t stick | Pick the folder again with **Export folder…** (security-scoped bookmark). |
+| Live Photo looks wrong length | Confirm trim mode and Cover; clips ≤3s keep full length; >3s use Start/Center/End/Custom (max 3s window). |
+
+**Log path** (App Sandbox — the host `~/Library/Application Support/…` path does **not** exist):
+
+```text
+~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application Support/LivePhotoConverter/debug.log
 ```
 
-If `No such file`, you have not launched a build that includes `DropLog` yet — pull tip, rebuild, ⌘R, then retry.
-
-After a crash: paste the last ~30 lines (include `—— session ——`) and note Choose files… vs drag.
-
-## UX notes (Software Team slices)
-
-- Drop / choose **appends** to the queue (path duplicates skipped).
-- **Start / Center / End** trim applies to every clip; **Custom** window + **Cover image** are per selected clip.
-- Cover row: square thumb + scrubber + **Set as Cover** (from preview playhead, clamped to trim). Preview timeline shows the Live Photo window (blue) and Cover tick.
-- **Custom** (>3s): inline trim preview above the filmstrip seeks with L/R/mid drag; duration chip on the blue window. Preview Disclosure stays collapsed unless opened.
-- Queue rows show failure reasons; remove with ✕.
-- After a successful run: **Open Photos** and/or **Reveal in Finder**.
-- **Cancel** stops between queue items (in-flight may finish). **Retry failed** re-queues only Failed rows.
-
-## Convert (single or batch)
-
-1. Drop **files** or a **folder** (or Choose files / folder).
-2. Set **Trim mode** if any clip is longer than 3s.
-3. In **Destinations**:
-   - Edit **Photos album** name
-   - Click **Export folder…** and confirm the path
-4. **Convert & Save to Photos** — sequential queue → named album  
-   or **Export pairs to folder** — HEIC+MOV into the chosen folder.
-5. Import tip for exports: select each HEIC+MOV pair **together** in Photos.
-
-## What the app writes
-
-| Resource | Metadata |
-|----------|----------|
-| HEIC still | MakerNote Apple key `17` = asset UUID |
-| MOV video | `com.apple.quicktime.content.identifier` = same UUID |
-| MOV timed track | `com.apple.quicktime.still-image-time` at Cover (still) time |
-
-## HTML UI preview
+Also: `…/last-breadcrumb.txt` in the same folder; Console.app filter `subsystem:com.jim.LivePhotoConverter`.
 
 ```bash
-cd preview && python3 -m http.server 8765 --bind 127.0.0.1
-# http://127.0.0.1:8765/
+LOG=~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application\ Support/LivePhotoConverter/debug.log
+tail -n 40 "$LOG"
+open -R "$LOG"
 ```
 
 ## Requirements
 
 - macOS 13+, Xcode 15+
-- Photos **read/write** permission (album create + add)
+- Photos **read/write** for album create + add
 
 ## Limitations
 
@@ -124,7 +73,16 @@ cd preview && python3 -m http.server 8765 --bind 127.0.0.1
 - Sequential batch conversion
 - Export folder access uses a security-scoped bookmark after the first pick
 
+## Docs
+
+- [Mac smoke checklist](docs/SMOKE.md) — Soft OPEN gate on tip
+- [Developer notes](docs/dev.md) — Photos API, metadata, eng/QA notes
+- [Changelog](CHANGELOG.md)
+
 ## Sponsors
 
 Support development via [GitHub Sponsors](https://github.com/sponsors/jim-ku). The repo **Sponsor** button is enabled through [`.github/FUNDING.yml`](.github/FUNDING.yml).
 
+## License
+
+[MIT](LICENSE) © 2026 Jim Ku (jim-ku)

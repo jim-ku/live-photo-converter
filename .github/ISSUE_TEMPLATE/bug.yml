@@ -1,0 +1,75 @@
+name: Bug report
+description: Something broke — include tip SHA, steps, and log
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing. Soft OPEN / ship bugs need a **tip or tag SHA**, the **exact failing step**, and a **log paste or path**.
+        Log (sandbox): `~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application Support/LivePhotoConverter/debug.log`
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      description: e.g. 14.5, 15.0
+      placeholder: "14.5"
+    validations:
+      required: true
+  - type: input
+    id: sha
+    attributes:
+      label: Tip or tag SHA
+      description: Output of `git rev-parse --short HEAD` (or a release tag)
+      placeholder: "8854bc1"
+    validations:
+      required: true
+  - type: textarea
+    id: failing-step
+    attributes:
+      label: Exact failing step
+      description: What you did and what you expected vs what happened (one concrete step)
+      placeholder: "Custom >3s — after Set as Cover, Convert & Save to Photos → Failed with …"
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log path / paste
+      description: Prefer last ~30 lines including `—— session ——`, or the full container path
+      placeholder: |
+        Path: ~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application Support/LivePhotoConverter/debug.log
+        Or paste:
+        —— session ——
+        …
+    validations:
+      required: true
+  - type: input
+    id: xcode
+    attributes:
+      label: Xcode version (optional)
+      description: e.g. 15.4
+      placeholder: "15.4"
+    validations:
+      required: false
+  - type: dropdown
+    id: trim-mode
+    attributes:
+      label: Trim context (optional)
+      description: Which trim path were you on?
+      options:
+        - Custom
+        - Start 3s
+        - Center 3s
+        - End 3s
+        - ≤3s full clip
+        - N/A / unknown
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context (optional)
+      description: Screenshots, Choose files vs drag, Photos vs Export, etc.
+    validations:
+      required: false
