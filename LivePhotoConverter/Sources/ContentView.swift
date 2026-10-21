@@ -517,7 +517,9 @@ final class ConverterViewModel: ObservableObject {
                     items[i].segment = pair.segment
 
                     if saveToPhotos, let album {
+                        DropLog.log("batch saveToPhotos item=\(items[i].filename) album=\(album.localizedTitle ?? albumTitle)")
                         try await LivePhotoEngine.saveToPhotos(pair, album: album)
+                        DropLog.log("batch saveToPhotos ok item=\(items[i].filename)")
                     } else if let exportDir = exportDirectory {
                         _ = try LivePhotoEngine.exportPair(pair, to: exportDir)
                         lastExportDirectory = exportDir

@@ -15,6 +15,7 @@ enum LivePhotoEngineError: LocalizedError {
     case photosDenied
     case photosSaveFailed(String)
     case albumCreateFailed
+    case albumAddFailed
     case exportFolderMissing
 
     var errorDescription: String? {
@@ -28,6 +29,7 @@ enum LivePhotoEngineError: LocalizedError {
         case .photosDenied: return "Photos access was denied. Enable it in System Settings → Privacy & Security → Photos."
         case .photosSaveFailed(let m): return m
         case .albumCreateFailed: return "Could not create or find the Photos album."
+        case .albumAddFailed: return "Live Photo was created but could not be added to the album. Check Photos → Library / Recents."
         case .exportFolderMissing: return "Choose an export folder before exporting pairs."
         }
     }
@@ -295,27 +297,73 @@ final class LivePhotoEngine {
         return result.firstObject
     }
 
-    /// Create Live Photo in the library and add it to `album`
-    /// via `PHAssetCreationRequest` + `PHAssetCollectionChangeRequest(for:)`.
+    /// Create Live Photo in the library and add it to `album`.
+    /// Two-step: create asset, then add a freshly fetched album change request
+    /// (single-block `PHAssetCollectionChangeRequest(for:)` often returns nil → empty album).
     static func saveToPhotos(_ pair: LivePhotoPair, album: PHAssetCollection) async throws {
         let status = await requestPhotosAccess()
         guard status == .authorized || status == .limited else {
             throw LivePhotoEngineError.photosDenied
         }
 
+        let albumID = album.localIdentifier
+        DropLog.log("saveToPhotos begin albumID=\(albumID) heic=\(pair.heicURL.lastPathComponent) mov=\(pair.movURL.lastPathComponent)")
+
+        guard FileManager.default.fileExists(atPath: pair.heicURL.path),
+              FileManager.default.fileExists(atPath: pair.movURL.path) else {
+            throw LivePhotoEngineError.photosSaveFailed("HEIC/MOV missing before Photos save")
+        }
+
+        var createdAssetID: String?
         try await PHPhotoLibrary.shared().performChanges {
             let request = PHAssetCreationRequest.forAsset()
             let options = PHAssetResourceCreationOptions()
             options.shouldMoveFile = false
             request.addResource(with: .photo, fileURL: pair.heicURL, options: options)
             request.addResource(with: .pairedVideo, fileURL: pair.movURL, options: options)
+            createdAssetID = request.placeholderForCreatedAsset?.localIdentifier
+        }
 
-            let placeholder = request.placeholderForCreatedAsset
-            let albumChange = PHAssetCollectionChangeRequest(for: album)
-            if let placeholder, let albumChange {
-                albumChange.addAssets([placeholder] as NSArray)
+        guard let assetID = createdAssetID else {
+            DropLog.log("saveToPhotos missing placeholder after create")
+            throw LivePhotoEngineError.photosSaveFailed("Photos did not return a created asset")
+        }
+        DropLog.log("saveToPhotos asset created id=\(assetID)")
+
+        var didAdd = false
+        try await PHPhotoLibrary.shared().performChanges {
+            let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
+            guard let asset = assets.firstObject else { return }
+            let albums = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [albumID], options: nil)
+            guard let freshAlbum = albums.firstObject else { return }
+            guard let albumChange = PHAssetCollectionChangeRequest(for: freshAlbum) else { return }
+            albumChange.addAssets([asset] as NSArray)
+            didAdd = true
+        }
+
+        if !didAdd {
+            DropLog.log("saveToPhotos album add failed (nil change request or missing asset/album)")
+            throw LivePhotoEngineError.albumAddFailed
+        }
+
+        // Verify membership
+        let albums = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [albumID], options: nil)
+        guard let freshAlbum = albums.firstObject else {
+            throw LivePhotoEngineError.albumCreateFailed
+        }
+        let inAlbum = PHAsset.fetchAssets(in: freshAlbum, options: nil)
+        var found = false
+        inAlbum.enumerateObjects { asset, _, stop in
+            if asset.localIdentifier == assetID {
+                found = true
+                stop.pointee = true
             }
         }
+        DropLog.log("saveToPhotos verify inAlbum=\(found) albumCount=\(inAlbum.count)")
+        if !found {
+            throw LivePhotoEngineError.albumAddFailed
+        }
+        DropLog.log("saveToPhotos ok")
     }
 
     /// Convenience: resolve/create album by name, then save.
