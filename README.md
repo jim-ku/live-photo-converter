@@ -28,11 +28,20 @@ Mac app that turns **MP4 / MOV / M4V** clips into Apple **Live Photos** (paired 
 
 Key photo defaults to the middle of the selected segment.
 
-## Open & run (Mac)
+## Build & run (Mac)
 
-1. Open `LivePhotoConverter.xcodeproj` in **Xcode 15+**.
-2. Scheme **LivePhotoConverter** → **My Mac** → Run (⌘R).
-3. Grant **Photos** access (read/write) when saving to an album.
+1. Clone / pull latest `main`:
+   ```bash
+   git clone https://github.com/jim-ku/live-photo-converter.git
+   cd live-photo-converter
+   git pull
+   git rev-parse --short HEAD   # note this SHA for QA
+   ```
+2. Open `LivePhotoConverter.xcodeproj` in **Xcode 15+**.
+3. Scheme **LivePhotoConverter** → destination **My Mac** → Run (⌘R).
+4. Grant **Photos** access (read/write) when saving to an album.
+
+Or from the CLI:
 
 ```bash
 cd /path/to/live-photo-converter
@@ -40,6 +49,35 @@ xcodebuild -scheme LivePhotoConverter -configuration Debug \
   -derivedDataPath ./build build
 open ./build/Build/Products/Debug/LivePhotoConverter.app
 ```
+
+## Diagnostics / crash logs
+
+Drop/ingest steps write a **crash-surviving** append log (flushed after every line).
+
+| What | Where |
+|------|--------|
+| Main log | `~/Library/Application Support/LivePhotoConverter/debug.log` |
+| Last line only | `~/Library/Application Support/LivePhotoConverter/last-breadcrumb.txt` |
+| In-app | **Reveal log** (selects `debug.log` in Finder) |
+| Console.app | Predicate: `subsystem:com.jim.LivePhotoConverter` (category `drop`) |
+
+On launch the log starts a session line like:
+
+`—— session —— v1.0 (…) bundle=com.jim.LivePhotoConverter rev=<sourceRevision>`
+
+After a crash (or a failed drop):
+
+1. Relaunch if needed → click **Reveal log**, **or** open the path above in Finder / Terminal.
+2. Paste the **last ~30 lines** into Software Team chat (include the session line so we know the build).
+3. Say whether **Choose files…** also crashes, or only **drag**.
+
+```bash
+# Terminal quick peek
+tail -n 40 ~/Library/Application\ Support/LivePhotoConverter/debug.log
+open -R ~/Library/Application\ Support/LivePhotoConverter/debug.log
+```
+
+**Note:** Older builds (`93a5116`) wrote to `~/Library/Logs/LivePhotoConverter/drop.log`. Current `main` uses Application Support `debug.log` only — pull + rebuild before filing a log.
 
 ## UX notes (Software Team slices)
 
