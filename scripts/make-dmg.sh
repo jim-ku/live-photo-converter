@@ -9,7 +9,7 @@ die() { echo "error: $*" >&2; exit 1; }
 
 APP="${1:-}"
 VERSION="${2:-${VERSION:-0.1.0}}"
-[[ -n "$APP" && -d "$APP" ]] || die "usage: $0 "/path/to/Video to Live Photo.app" [VERSION]"
+[[ -n "$APP" && -d "$APP" ]] || die "usage: $0 <Video to Live Photo.app> [VERSION]"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGE="$ROOT/build/dmg-stage"
