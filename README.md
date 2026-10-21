@@ -78,6 +78,7 @@ open -R "$LOG"
 - [Mac smoke checklist](docs/SMOKE.md) — Soft OPEN gate on tip
 - [Developer notes](docs/dev.md) — Photos API, metadata, eng/QA notes
 - [Release runbook](docs/RELEASE.md) — maintainers: Developer ID → notarytool → DMG → `gh release`
+- [CI workflow (paste-ready)](docs/ci-workflow.yml) — copy to `.github/workflows/ci.yml` when PAT has `workflow` scope
 - [Changelog](CHANGELOG.md)
 
 ## Sponsors
