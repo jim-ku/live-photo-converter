@@ -17,7 +17,7 @@ First public cut. App UI base Soft OPEN tip [`8854bc1`](https://github.com/jim-k
 - Help → How to use; Defaults vs per-clip Override; Photos album + Export folder destinations.
 - Sponsors funding YAML (`.github/FUNDING.yml`).
 - Slice A docs: MIT `LICENSE`, user README (Install → Use → Troubleshoot), `docs/SMOKE.md`, `docs/dev.md`, bug issue template, changelog.
-- Slice B prep: `docs/RELEASE.md`, `scripts/macos-release.sh`, `scripts/make-dmg.sh`, CI Debug build, marketing version `0.1.0`, release-notes draft.
+- Slice B prep: `docs/RELEASE.md`, `scripts/macos-release.sh`, `scripts/make-dmg.sh`, paste-ready CI (`docs/ci-workflow.yml` → `.github/workflows/ci.yml`), marketing version `0.1.0`, release-notes draft.
 
 ### Notes
 
