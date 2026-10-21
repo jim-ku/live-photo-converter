@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import AVFoundation
 import CoreMedia
 import UniformTypeIdentifiers
 import AppKit
@@ -48,7 +49,7 @@ struct QueueItem: Identifiable, Equatable {
     var segment: LivePhotoSegment?
     /// Per-clip Custom trim (used when resolved mode is .custom).
     var customTrim: CustomTrimTemplate
-    /// Per-clip key photo position within the selected segment (0…1).
+    /// Per-clip Cover image position within the selected segment (0…1). Internal name kept.
     var keyframePercent: Double
     /// `nil` = Default badge (inherit app trim); set in slice 3 when user overrides.
     var override: TrimSettings?
@@ -267,7 +268,7 @@ final class ConverterViewModel: ObservableObject {
         }
     }
 
-    /// Seek preview to the key photo time inside the planned segment.
+    /// Seek preview to the Cover image time inside the planned segment.
     func seekPlayerToKeyframe(for item: QueueItem, in av: AVPlayer? = nil) {
         guard let seg = item.segment else { return }
         let target = seg.start + seg.duration * item.keyframePercent
@@ -413,7 +414,28 @@ final class ConverterViewModel: ObservableObject {
 
     func updateKeyframe(_ percent: Double) {
         guard let id = selectedID, let idx = items.firstIndex(where: { $0.id == id }) else { return }
-        // Keyframe is always per-clip; does not flip Default/Override (trim-only badge).
+        // Cover is always per-clip; does not flip Default/Override (trim-only badge).
+        items[idx].keyframePercent = percent
+        seekPlayerToKeyframe(for: items[idx])
+    }
+
+    /// Set Cover image from current preview playhead (clamped into trim window). No badge flip.
+    func setCoverFromPreviewPlayhead() {
+        guard let id = selectedID, let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        guard let seg = items[idx].segment, seg.duration > 0 else { return }
+        let playhead: TimeInterval
+        if let p = player {
+            let t = p.currentTime().seconds
+            playhead = t.isFinite ? t : (seg.start + seg.duration * items[idx].keyframePercent)
+        } else {
+            // Preview collapsed / no player — keep scrubber value (already the cover).
+            playhead = seg.start + seg.duration * items[idx].keyframePercent
+        }
+        let lo = seg.start
+        let hi = seg.start + seg.duration
+        let clamped = min(max(playhead, lo), hi)
+        var percent = (clamped - seg.start) / seg.duration
+        percent = max(0.05, min(percent, 0.95))
         items[idx].keyframePercent = percent
         seekPlayerToKeyframe(for: items[idx])
     }
@@ -687,7 +709,7 @@ struct ContentView: View {
                         Divider().padding(.vertical, 4)
                         trimSummary
                         if let item = model.selectedItem {
-                            previewSection(for: item)
+                            coverSection(for: item)
                             if item.duration > LivePhotoEngine.maxLiveDuration,
                                item.resolvedTrimMode(appDefaults: model.appDefaults) == .custom {
                                 CustomTrimView(
@@ -716,6 +738,7 @@ struct ContentView: View {
                                     )
                                 )
                             }
+                            previewSection(for: item)
                         }
                         destinationSettings
                         actions
@@ -977,11 +1000,10 @@ struct ContentView: View {
                         segmentDuration: seg.duration,
                         keyframePercent: item.keyframePercent
                     )
-                    Text("Blue = Live Photo window · white tick = key photo (preview seeks here)")
+                    Text("Blue = Live Photo window · white tick = Cover image (preview seeks here)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-                keyframeScrubber(for: item)
             }
             .padding(.top, 6)
         } label: {
@@ -996,39 +1018,65 @@ struct ContentView: View {
         }
     }
 
-    private func keyframeScrubber(for item: QueueItem) -> some View {
+    /// Slice 7: Cover image row — thumb + scrubber + Set as Cover (Queue → Cover/trim → Preview).
+    private func coverSection(for item: QueueItem) -> some View {
         let seg = item.segment
-        return VStack(alignment: .leading, spacing: 8) {
+        let coverTime: TimeInterval = {
+            guard let seg else { return 0 }
+            return seg.start + seg.duration * item.keyframePercent
+        }()
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Key photo")
-                    .font(.subheadline.weight(.medium))
+                Text("Cover image")
+                    .font(.subheadline.weight(.semibold))
                 Spacer()
                 Text("This clip only")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Slider(
-                value: Binding(
-                    get: { item.keyframePercent },
-                    set: { model.updateKeyframe($0) }
-                ),
-                in: 0.05...0.95
-            )
-            .disabled(model.isBatchRunning)
-            if let seg {
-                Text(String(
-                    format: "At %.1fs of source (%.0f%% of %.1fs segment)",
-                    seg.start + seg.duration * item.keyframePercent,
-                    item.keyframePercent * 100,
-                    seg.duration
-                ))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+
+            HStack(alignment: .center, spacing: 12) {
+                CoverThumbView(url: item.url, timeSeconds: coverTime)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Slider(
+                        value: Binding(
+                            get: { item.keyframePercent },
+                            set: { model.updateKeyframe($0) }
+                        ),
+                        in: 0.05...0.95
+                    )
+                    .disabled(model.isBatchRunning || item.duration <= 0)
+                    if let seg {
+                        Text(String(
+                            format: "At %.1fs of source (%.0f%% of %.1fs segment)",
+                            seg.start + seg.duration * item.keyframePercent,
+                            item.keyframePercent * 100,
+                            seg.duration
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    } else {
+                        Text("Select a ready clip to set Cover image.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Button {
+                    model.setCoverFromPreviewPlayhead()
+                } label: {
+                    Label("Set as Cover", systemImage: "photo")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .disabled(model.isBatchRunning || seg == nil)
+                .help("Set Cover image from the current preview playhead (clamped to the Live Photo window)")
             }
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.primary.opacity(0.04))
         )
     }
@@ -1340,7 +1388,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Segment + keyframe overlay (source timeline)
+// MARK: - Segment + Cover tick overlay (source timeline)
 
 /// AVPlayerView is more stable than SwiftUI VideoPlayer for local sandbox files on Mac.
 struct MacPlayerView: NSViewRepresentable {
@@ -1710,6 +1758,67 @@ struct DefaultsView: View {
 }
 
 
+
+// MARK: - Cover thumb (slice 7)
+
+/// Square still at Cover time — regenerates when url / time change.
+struct CoverThumbView: View {
+    let url: URL
+    let timeSeconds: TimeInterval
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.secondary.opacity(0.12))
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Image(systemName: "photo")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 56, height: 56)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(0.55), lineWidth: 1.5)
+        )
+        .task(id: "\(url.path)|\(String(format: "%.3f", timeSeconds))") {
+            image = await Self.generateThumb(url: url, at: timeSeconds)
+        }
+    }
+
+    private static func generateThumb(url: URL, at seconds: TimeInterval) async -> NSImage? {
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 168, height: 168)
+        let slop = CMTime(seconds: 0.08, preferredTimescale: 600)
+        generator.requestedTimeToleranceAfter = slop
+        generator.requestedTimeToleranceBefore = slop
+        let time = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
+        do {
+            if #available(macOS 13.0, *) {
+                let result = try await generator.image(at: time)
+                let cg = result.image
+                return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+            } else {
+                var actual = CMTime.zero
+                let cg = try generator.copyCGImage(at: time, actualTime: &actual)
+                return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+            }
+        } catch {
+            DropLog.log("CoverThumbView failed t=\(seconds): \(error)")
+            return nil
+        }
+    }
+}
+
 // MARK: - Help (slice 6)
 
 struct HelpView: View {
@@ -1719,6 +1828,7 @@ struct HelpView: View {
         ("Drop or append", "Drop MP4/MOV files or a folder onto the dashed area. With a queue open, use the thin bar under Queue or Add files / Add folder."),
         ("Defaults vs Override", "Defaults (toolbar) set the app trim for new drops and Default-badge clips. Editing This clip’s mode or custom window sets Override for that clip only; Reset clears it."),
         ("Custom filmstrip", "For clips longer than 3s in Custom mode: drag the blue window to move; pull L/R handles to set length (max 3s)."),
+        ("Cover image", "Cover image is the still frame for the Live Photo (this clip only). Drag the scrubber, or expand Preview and scrub the player, then tap Set as Cover. Does not change Default/Override."),
         ("Preview", "Preview starts collapsed — no player until you expand. Collapse tears the player down. Switching clips while collapsed stays quiet."),
         ("Export / Photos", "Set Photos album and/or Export folder under Destinations. Convert & Save to Photos, or Export pairs to folder."),
         ("Reveal log", "Toolbar Reveal log opens the debug log in Finder if something fails."),

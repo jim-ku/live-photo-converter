@@ -26,7 +26,7 @@ Mac app that turns **MP4 / MOV / M4V** clips into Apple **Live Photos** (paired 
 | **&lt; 1.5s** | Still keep full length; soft warning that Photos may not treat it as ideal Live Photo length. |
 | **&gt; 3s** | **Start 3s** / **Center 3s** / **End 3s** / **Custom** sliding window (0.5–3s). |
 
-Key photo defaults to the middle of the selected segment.
+Cover image defaults to the middle of the selected segment.
 
 ## Build
 
@@ -80,8 +80,8 @@ After a crash: paste the last ~30 lines (include `—— session ——`) and no
 ## UX notes (Software Team slices)
 
 - Drop / choose **appends** to the queue (path duplicates skipped).
-- **Start / Center / End** trim applies to every clip; **Custom** window + **key photo** are per selected clip.
-- Preview timeline shows the Live Photo window (blue) and key-photo tick; player seeks to the keyframe.
+- **Start / Center / End** trim applies to every clip; **Custom** window + **Cover image** are per selected clip.
+- Cover row: square thumb + scrubber + **Set as Cover** (from preview playhead, clamped to trim). Preview timeline shows the Live Photo window (blue) and Cover tick.
 - Queue rows show failure reasons; remove with ✕.
 - After a successful run: **Open Photos** and/or **Reveal in Finder**.
 - **Cancel** stops between queue items (in-flight may finish). **Retry failed** re-queues only Failed rows.
@@ -103,7 +103,7 @@ After a crash: paste the last ~30 lines (include `—— session ——`) and no
 |----------|----------|
 | HEIC still | MakerNote Apple key `17` = asset UUID |
 | MOV video | `com.apple.quicktime.content.identifier` = same UUID |
-| MOV timed track | `com.apple.quicktime.still-image-time` at keyframe time |
+| MOV timed track | `com.apple.quicktime.still-image-time` at Cover (still) time |
 
 ## HTML UI preview
 

@@ -23,7 +23,7 @@ enum LivePhotoEngineError: LocalizedError {
         case .noVideoTrack: return "No video track found in the file."
         case .cannotCreateWriter: return "Could not create the Live Photo video writer."
         case .cannotCreateReader: return "Could not read the source video."
-        case .cannotExtractKeyframe: return "Could not extract a keyframe for the still image."
+        case .cannotExtractKeyframe: return "Could not extract a Cover image still frame."
         case .cannotWriteHEIC: return "Could not write the Live Photo HEIC still image."
         case .exportFailed(let m): return m
         case .photosDenied: return "Photos access was denied. Enable it in System Settings → Privacy & Security → Photos."
