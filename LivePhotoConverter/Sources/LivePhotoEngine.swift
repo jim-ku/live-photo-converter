@@ -624,10 +624,10 @@ final class LivePhotoEngine {
         ]
         var desc: CMFormatDescription?
         CMMetadataFormatDescriptionCreateWithMetadataSpecifications(
-            kCFAllocatorDefault,
-            kCMMetadataFormatType_Boxed,
-            [spec] as CFArray,
-            &desc
+            allocator: kCFAllocatorDefault,
+            metadataType: kCMMetadataFormatType_Boxed,
+            metadataSpecifications: [spec] as CFArray,
+            formatDescriptionOut: &desc
         )
         let input = AVAssetWriterInput(
             mediaType: .metadata,
