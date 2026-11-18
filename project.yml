@@ -25,3 +25,8 @@ targets:
         CURRENT_PROJECT_VERSION: "0.1.0"
     entitlements:
       path: LivePhotoConverter/LivePhotoConverter.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+        com.apple.security.personal-information.photos-library: true

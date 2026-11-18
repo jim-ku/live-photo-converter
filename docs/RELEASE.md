@@ -112,17 +112,7 @@ xcrun stapler staple "$APP"
 
 ## CI (GitHub Actions)
 
-Box PAT lacked `workflow` scope, so the Debug build YAML lives at [`docs/ci-workflow.yml`](ci-workflow.yml). On Jim Mac / GitHub UI:
-
-```bash
-mkdir -p .github/workflows
-cp docs/ci-workflow.yml .github/workflows/ci.yml
-git add .github/workflows/ci.yml
-git commit -m "ci: macOS Debug xcodebuild on push/PR"
-git push
-```
-
-Or grant the bot PAT `workflow` scope and ask Fullstack to move the file.
+The [CI workflow](../.github/workflows/ci.yml) builds the unsigned Debug app and runs the regression suite on macOS. Run `swift test` locally before the signed-app smoke test.
 
 ## After Release
 

@@ -1,63 +1,18 @@
-# Mac smoke checklist (Soft OPEN)
+# Mac release smoke test
 
-Run against tip **`8854bc1`** (or later tip on `main` that includes Soft OPEN polish). Record the tip SHA before filing results.
+Record the commit, macOS version, Xcode version, and signed build under test. Use a dedicated macOS test account with a disposable System Photo Library for the Photos steps.
 
-```bash
-cd live-photo-converter
-git pull
-git rev-parse --short HEAD   # paste into results
-```
+| Check | Expected result |
+|---|---|
+| Drop a folder containing two videos with the same name in different subfolders. Append one of them again. | Both distinct videos appear with their original names. The duplicate is skipped. |
+| Select clips using the arrow keys at wide and narrow window sizes. | The queue, selected editor, and pinned action bar remain usable. Delete removes the selected row. |
+| Set Custom in trim defaults and select a long clip. Adjust defaults again. | The viewed clip inherits the change. Dragging a handle or editing a numeric field affects that clip. Reset restores inheritance. |
+| Play a custom segment, scrub, choose a cover and step one frame. Repeat with a short clip. | Motion stays inside the selected segment. The cover thumbnail and marker follow the edit. A short clip keeps its full duration. |
+| Select Folder and start the first export. Choose a folder in the picker. | Export continues immediately. Both resources share a source-based name. Existing files survive. Reveal in Finder opens that folder. |
+| Switch that queue to Photos, enter a new album name, and save. | Granting access creates one playable Live Photo per clip in that album. Check the still, motion, orientation and sound. A repeat run shows zero eligible clips. |
+| Edit a cover, then switch between two destinations. | Only the edited clip needs delivery to each previous destination. Counts refer to this run. |
+| Deny Photos permission in the test account, then restore it and retry. | The error is actionable. Folder export remains available. Retry saves the failed items. |
+| Stop a multi-item batch, then resume. | The current clip finishes, remaining clips stay pending, and completed clips are skipped on resume. |
+| Relaunch the sandboxed app and export to the remembered folder. | The folder is writable without choosing it again. |
 
-Build: Xcode 15+ → scheme **LivePhotoConverter** → **My Mac** → ⌘R.
-
-After rebuild, confirm Dock / window title / default Photos album show **Video to Live Photo** (bundle id remains `com.jim.LivePhotoConverter`).
-
-## Pass criteria
-
-Check each row. **PASS** only if all applicable rows are green.
-
-### A. Custom + source longer than 3s
-
-| # | Step | Expected |
-|---|------|----------|
-| A1 | Drop/add a clip **> 3s** | Appears in queue |
-| A2 | Set trim to **Custom** (Defaults or This clip Override) | Custom filmstrip appears **under** the trim picker, **before** Cover |
-| A3 | Drag blue window / L–R handles | Window moves; length ≤ 3s; inline preview above strip seeks with active edge |
-| A4 | Cover row | Thumb + scrubber + **Set as Cover** work; Cover clamped to trim |
-| A5 | Preview Disclosure | Stays **collapsed** unless you open it; convert still works collapsed |
-
-### B. Start / Center / End (clip > 3s)
-
-| # | Step | Expected |
-|---|------|----------|
-| B1 | Pick **Start 3s** (then Center, then End) | Blue Live Photo window visible **without** expanding Preview |
-| B2 | Filmstrip | **No** Custom filmstrip mounted |
-| B3 | Cover | Scrub / **Set as Cover** still available |
-
-### C. Cover image
-
-| # | Step | Expected |
-|---|------|----------|
-| C1 | Drag Cover scrubber | Thumb updates; Default/Override badge **unchanged** |
-| C2 | Expand Preview, scrub player, **Set as Cover** | Cover jumps to playhead (clamped into trim) |
-
-### D. Help / Defaults / destinations
-
-| # | Step | Expected |
-|---|------|----------|
-| D1 | Open **Help** | “How to use” sheet matches README Use section |
-| D2 | **Defaults** vs edit This clip | Defaults apply to new/Default-badge clips; per-clip edit → **Override**; Reset clears Override |
-| D3 | Destinations → Photos album name | **Convert & Save to Photos** lands in that album |
-| D4 | Destinations → **Export folder…** | **Export pairs to folder** writes HEIC+MOV into chosen folder |
-
-### E. Record
-
-| Field | Value |
-|-------|--------|
-| Tip SHA (short) | ________ |
-| macOS version | ________ |
-| Xcode version | ________ |
-| Result | PASS / FAIL (failing step: ____) |
-| Log paste / path | `~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application Support/LivePhotoConverter/debug.log` |
-
-Ship Soft OPEN = this checklist green on Jim’s Mac at tip `8854bc1` (or the SHA under test). Separate from Slice A docs landing on `main`.
+Run `swift test` for the simulated album-add failure and tests of metadata, geometry, cleanup, and recovery. Record any failing manual step and the diagnostic log from Help.

@@ -25,25 +25,20 @@ open "./build/Build/Products/Debug/Video to Live Photo.app"
 
 ## Use
 
-Matches in-app **Help → How to use**:
+1. Drop MP4, MOV, or M4V videos or a folder into the window. Use the **+** menu to append more. The queue shows the original filenames and skips repeated source paths.
+2. Select a video. For clips over three seconds, choose **Start**, **Center**, **End**, or **Custom**. Drag the custom window or enter its start and duration. Shorter clips use their full length. **Trim defaults** applies to clips that inherit settings. **Reset** restores inheritance.
+3. Use **Play selected segment** to review motion. Scrub the playhead and choose **Use current frame as cover**, or use the cover slider and frame-step buttons. The white line on the timeline marks the cover.
+4. In the bottom bar, choose **Photos album** or **Folder**. Enter an album name or choose a folder, then save or export. The action count shows how many clips still need delivery there. Switch destinations to deliver the same edits again.
+5. Use **Open Photos** or **Reveal in Finder** to inspect the result. Exports use the source name with matching HEIC and MOV extensions. Existing names get a numbered suffix. Select both files together when importing a pair into Photos.
 
-1. **Drop or append** — Drop MP4/MOV/M4V files or a folder onto the dashed area. With a queue open, use the thin bar under Queue, or **Add files** / **Add folder**.
-2. **Defaults vs Override** — **Defaults** (toolbar) set the app trim for new drops and Default-badge clips. Editing **This clip**’s mode or custom window sets **Override** for that clip only; **Reset** clears it.
-3. **Trim (clips longer than 3s)** — Choose **Start 3s** / **Center 3s** / **End 3s** / **Custom**. Clips **≤ 3s** keep the full original (no pad / no loop). Soft warning if under ~1.5s.
-4. **Custom filmstrip** — In Custom mode: drag the blue window to move; pull L/R handles to set length (max 3s). Inline preview above the strip seeks with the active edge. Preview Disclosure stays collapsed until you open it. Start/Center/End show the blue Live Photo window without expanding Preview and without a filmstrip.
-5. **Cover image** — Still frame for the Live Photo (this clip only). Drag the scrubber, or expand Preview and scrub the player, then tap **Set as Cover**. Does not change Default/Override.
-6. **Preview** — Starts collapsed (no player until you expand). Collapse tears the player down. Switching clips while collapsed stays quiet.
-7. **Export / Photos** — Under **Destinations**, set **Photos album** name and/or **Export folder…**. Then **Convert & Save to Photos** (named album) or **Export pairs to folder** (flat `LivePhoto-<id>.HEIC` / `.MOV`). Import tip for exports: select each HEIC+MOV pair **together** in Photos.
-8. **Reveal log** — Toolbar **Reveal log** opens the debug log in Finder if something fails.
-
-After a successful run: **Open Photos** and/or **Reveal in Finder**. **Cancel** stops between queue items. **Retry failed** re-queues only Failed rows.
+The queue supports arrow-key selection and Delete. Command-Return starts the selected output action. **Stop after this clip** leaves remaining items pending. **Retry failed** acts on failures for the selected destination. If an asset reached the library before album placement failed, retry adds that asset to the album.
 
 ## Troubleshoot
 
 | Symptom | What to try |
 |---------|-------------|
 | Photos permission denied | Grant **Photos** read/write when prompted (System Settings → Privacy & Security → Photos). |
-| “No such file” for the log | Launch the app once (⌘R) so the container path is created, then **Reveal log**. |
+| “No such file” for the log | Launch the app once (⌘R) so the container path is created, then **Help → Reveal diagnostic log**. |
 | Convert fails / crash | Note tip SHA (`git rev-parse --short HEAD`), copy last ~30 log lines (include `—— session ——`), and file a [bug report](https://github.com/jim-ku/live-photo-converter/issues/new?template=bug.yml). |
 | Export folder won’t stick | Pick the folder again with **Export folder…** (security-scoped bookmark). |
 | Live Photo looks wrong length | Confirm trim mode and Cover; clips ≤3s keep full length; >3s use Start/Center/End/Custom (max 3s window). |
@@ -75,10 +70,10 @@ open -R "$LOG"
 
 ## Docs
 
-- [Mac smoke checklist](docs/SMOKE.md) — Soft OPEN gate on tip
+- [Mac smoke checklist](docs/SMOKE.md) — release checks
 - [Developer notes](docs/dev.md) — Photos API, metadata, eng/QA notes
 - [Release runbook](docs/RELEASE.md) — maintainers: Developer ID → notarytool → DMG → `gh release`
-- [CI workflow (paste-ready)](docs/ci-workflow.yml) — copy to `.github/workflows/ci.yml` when PAT has `workflow` scope
+- [CI workflow](.github/workflows/ci.yml) — builds the app and runs `swift test` on macOS
 - [Changelog](CHANGELOG.md)
 
 ## Sponsors

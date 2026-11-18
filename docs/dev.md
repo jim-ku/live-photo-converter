@@ -2,19 +2,11 @@
 
 Engineering / QA reference. User docs live in the root [README](../README.md).
 
-## Destinations (implementation)
+## Conversion and delivery
 
-| Action | Where it goes |
-|--------|----------------|
-| **Convert & Save to Photos** | A **custom album** you name (default: `Video to Live Photo`). Album is created if missing; every successful convert in the batch is added. |
-| **Export pairs to folder** | Folder from **Export folder…**. HEIC+MOV pairs written **flat** with unique names (`LivePhoto-<id>.HEIC` / `.MOV`). Path remembered via UserDefaults + security-scoped bookmark. |
+Each queue entry owns a temporary working copy of its source, its current generated pair, a library asset identifier, and delivery results by album name or folder URL. Editing the effective segment or cover invalidates those results. Removing the entry releases its temporary media.
 
-### Photos album API path
-
-1. `PHPhotoLibrary.requestAuthorization(for: .readWrite)`
-2. `PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, …)` filtered by `title`
-3. If missing: `PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle:)`
-4. Per asset: `PHAssetCreationRequest.forAsset()` (HEIC `.photo` + MOV `.pairedVideo`) then `PHAssetCollectionChangeRequest(for: album).addAssets([placeholder])`
+The Photos destination resolves or creates a regular album with read/write access. It commits the HEIC and paired MOV in a library creation transaction, records the resulting asset ID, and then adds the asset to the album. An album retry reuses that ID. Folder export stages both resources within the chosen filesystem and publishes both under an available source-based name using exclusive moves.
 
 ## Duration & trim rules
 
@@ -26,16 +18,9 @@ Engineering / QA reference. User docs live in the root [README](../README.md).
 
 Cover image defaults to the middle of the selected segment.
 
-## Soft OPEN UX (tip `8854bc1`)
+## Running the regressions
 
-- Drop / choose **appends** to the queue (path duplicates skipped).
-- **Start / Center / End** trim applies to every clip; **Custom** window + **Cover image** are per selected clip.
-- Cover row: square thumb + scrubber + **Set as Cover** (from preview playhead, clamped to trim). Preview timeline shows the Live Photo window (blue) and Cover tick.
-- **Custom** (>3s): inline trim preview above the filmstrip seeks with L/R/mid drag; duration chip on the blue window. Preview Disclosure stays collapsed unless opened.
-- **Start / Center / End**: blue Live Photo window without expanding Preview; no filmstrip.
-- Queue rows show failure reasons; remove with ✕.
-- After a successful run: **Open Photos** and/or **Reveal in Finder**.
-- **Cancel** stops between queue items (in-flight may finish). **Retry failed** re-queues only Failed rows.
+Run `swift test` on a Mac with Xcode. Tests create moving landscape and rotated portrait media, exercise real AVFoundation conversion and PhotoKit resource validation, and use an isolated album store for permission, partial-save, retry, and batch tests. The release checks in [SMOKE.md](SMOKE.md) cover library writes in the signed app.
 
 ## What the app writes
 
@@ -53,14 +38,14 @@ App Sandbox remaps Application Support into the **container**. The host path `~/
 |------|--------|
 | Main log | `~/Library/Containers/com.jim.LivePhotoConverter/Data/Library/Application Support/LivePhotoConverter/debug.log` |
 | Last line | `…/last-breadcrumb.txt` (same folder) |
-| In-app | **Reveal log** (header) |
+| In-app | **Help → Reveal diagnostic log** |
 | Console.app | `subsystem:com.jim.LivePhotoConverter` |
 
 If `No such file`, you have not launched a build that includes `DropLog` yet — pull tip, rebuild, ⌘R, then retry.
 
 After a crash: paste the last ~30 lines (include `—— session ——`) and note Choose files… vs drag. Always record tip SHA for QA.
 
-## HTML UI preview
+## Historical HTML prototype
 
 ```bash
 cd preview && python3 -m http.server 8765 --bind 127.0.0.1

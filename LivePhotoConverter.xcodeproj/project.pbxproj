@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		2E85F98BF953423DB14CC79C /* LivePhotoConverterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* LivePhotoConverterApp.swift */; };
 		A160F9EC5B1A407FABA941CD /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* ContentView.swift */; };
+		B160F9EC5B1A407FABA941C6 /* ConverterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* ConverterViewModel.swift */; };
+		B160F9EC5B1A407FABA941C7 /* ClipEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* ClipEditor.swift */; };
 		4F0A14BEA80F40DBBAD10182 /* LivePhotoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* LivePhotoEngine.swift */; };
 		D23FD87A04F8467FA0C9654A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* Assets.xcassets */; };
 		C96AC33A47A04B6A840CEFB7 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* AVFoundation.framework */; };
@@ -21,6 +23,8 @@
 /* Begin PBXFileReference section */
 		A10000000000000000000001 /* LivePhotoConverterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoConverterApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A10000000000000000000021 /* ConverterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConverterViewModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000007 /* ClipEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* LivePhotoEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoEngine.swift; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -73,6 +77,8 @@
 			children = (
 				A10000000000000000000001 /* LivePhotoConverterApp.swift */,
 				A10000000000000000000002 /* ContentView.swift */,
+				A10000000000000000000021 /* ConverterViewModel.swift */,
+				A10000000000000000000007 /* ClipEditor.swift */,
 				A10000000000000000000003 /* LivePhotoEngine.swift */,
 			);
 			path = Sources;
@@ -157,6 +163,8 @@
 			files = (
 				2E85F98BF953423DB14CC79C /* LivePhotoConverterApp.swift in Sources */,
 				A160F9EC5B1A407FABA941CD /* ContentView.swift in Sources */,
+				B160F9EC5B1A407FABA941C6 /* ConverterViewModel.swift in Sources */,
+				B160F9EC5B1A407FABA941C7 /* ClipEditor.swift in Sources */,
 				4F0A14BEA80F40DBBAD10182 /* LivePhotoEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

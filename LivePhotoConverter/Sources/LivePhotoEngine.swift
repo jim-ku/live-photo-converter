@@ -54,7 +54,7 @@ struct CustomTrimTemplate: Equatable, Codable {
     static let `default` = CustomTrimTemplate(startOffset: 0, windowLength: 3.0)
 }
 
-/// Persisted app-wide trim defaults (UserDefaults). Per-clip override is `QueueItem.override` (slice 3).
+/// Persisted app-wide trim defaults (UserDefaults). Per-clip override is `QueueItem.override`.
 struct AppDefaults: Equatable {
     var trimMode: TrimMode
     var customTrim: CustomTrimTemplate
@@ -65,8 +65,7 @@ struct AppDefaults: Equatable {
     private static let customStartKey = "appDefaults.customStartOffset"
     private static let customLengthKey = "appDefaults.customWindowLength"
 
-    static func load() -> AppDefaults {
-        let ud = UserDefaults.standard
+    static func load(from ud: UserDefaults = .standard) -> AppDefaults {
         let mode: TrimMode
         if let raw = ud.string(forKey: trimModeKey), let parsed = TrimMode(rawValue: raw) {
             mode = parsed
@@ -81,8 +80,7 @@ struct AppDefaults: Equatable {
         )
     }
 
-    func save() {
-        let ud = UserDefaults.standard
+    func save(to ud: UserDefaults = .standard) {
         ud.set(trimMode.rawValue, forKey: Self.trimModeKey)
         ud.set(customTrim.startOffset, forKey: Self.customStartKey)
         ud.set(customTrim.windowLength, forKey: Self.customLengthKey)
@@ -105,27 +103,9 @@ struct LivePhotoSegment: Equatable {
 
     var end: TimeInterval { start + duration }
 
-    var summary: String {
-        if sourceDuration <= LivePhotoEngine.maxLiveDuration + 0.001 {
-            if isShortWarning {
-                return String(
-                    format: "Using full clip (%.1fs) — under %.1fs; Photos may not treat it as ideal Live Photo length",
-                    sourceDuration,
-                    LivePhotoEngine.minLiveDuration
-                )
-            }
-            return String(format: "Using full clip (%.1fs)", sourceDuration)
-        }
-        switch mode {
-        case .start3s:
-            return String(format: "Start 3s: %.1fs–%.1fs of %.1fs", start, end, sourceDuration)
-        case .center3s:
-            return String(format: "Center 3s: %.1fs–%.1fs of %.1fs", start, end, sourceDuration)
-        case .end3s:
-            return String(format: "End 3s: %.1fs–%.1fs of %.1fs", start, end, sourceDuration)
-        case .custom:
-            return String(format: "Custom: %.1fs–%.1fs (%.1fs of %.1fs)", start, end, duration, sourceDuration)
-        }
+    func coverTime(at fraction: Double) -> Double {
+        // The selection end is exclusive. Stay at least one media-clock tick inside it.
+        start + min(duration * min(max(fraction, 0), 1), max(0, duration - 1.0 / 60_000))
     }
 }
 
@@ -229,21 +209,12 @@ final class LivePhotoEngine {
         return results.sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
     }
 
-    static func loadDuration(of url: URL) async throws -> TimeInterval {
-        DropLog.log("LivePhotoEngine.loadDuration AVURLAsset \(url.path)")
-        let asset = AVURLAsset(url: url)
-        DropLog.log("LivePhotoEngine.loadDuration loading .duration")
-        let duration = try await asset.load(.duration)
-        let seconds = CMTimeGetSeconds(duration)
-        DropLog.log("LivePhotoEngine.loadDuration seconds=\(seconds) valid=\(duration.isValid)")
-        return seconds
-    }
-
     static func convert(
         videoURL: URL,
         mode: TrimMode,
         custom: CustomTrimTemplate = .default,
         keyframePercent: Double = 0.5,
+        workingDirectory: URL = FileManager.default.temporaryDirectory,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> LivePhotoPair {
         let asset = AVURLAsset(url: videoURL)
@@ -251,17 +222,19 @@ final class LivePhotoEngine {
         let segment = plannedSegment(sourceDuration: sourceDuration, mode: mode, custom: custom)
         let assetIdentifier = UUID().uuidString
 
-        let workDir = FileManager.default.temporaryDirectory
+        let workDir = workingDirectory
             .appendingPathComponent("LivePhotoConverter-\(assetIdentifier)", isDirectory: true)
         try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
 
+        var completed = false
+        defer { if !completed { try? FileManager.default.removeItem(at: workDir) } }
         progress(0.05)
 
         let heicURL = workDir.appendingPathComponent("IMG_\(assetIdentifier).HEIC")
         let movURL = workDir.appendingPathComponent("IMG_\(assetIdentifier).MOV")
 
-        let keyTime = segment.start + segment.duration * max(0.05, min(keyframePercent, 0.95))
-        try await extractAndStampHEIC(
+        let keyTime = segment.coverTime(at: keyframePercent)
+        let actualTime = try await extractAndStampHEIC(
             asset: asset,
             at: keyTime,
             assetIdentifier: assetIdentifier,
@@ -273,12 +246,13 @@ final class LivePhotoEngine {
             source: asset,
             segment: segment,
             assetIdentifier: assetIdentifier,
-            keyframePercent: keyframePercent,
+            coverOffset: max(actualTime - segment.start, 0),
             to: movURL,
             progress: { p in progress(0.25 + p * 0.7) }
         )
         progress(1.0)
 
+        completed = true
         return LivePhotoPair(
             heicURL: heicURL,
             movURL: movURL,
@@ -332,18 +306,7 @@ final class LivePhotoEngine {
         return result.firstObject
     }
 
-    /// Create Live Photo in the library and add it to `album`.
-    /// Two-step: create asset, then add a freshly fetched album change request
-    /// (single-block `PHAssetCollectionChangeRequest(for:)` often returns nil → empty album).
-    static func saveToPhotos(_ pair: LivePhotoPair, album: PHAssetCollection) async throws {
-        let status = await requestPhotosAccess()
-        guard status == .authorized || status == .limited else {
-            throw LivePhotoEngineError.photosDenied
-        }
-
-        let albumID = album.localIdentifier
-        DropLog.log("saveToPhotos begin albumID=\(albumID) heic=\(pair.heicURL.lastPathComponent) mov=\(pair.movURL.lastPathComponent)")
-
+    static func createPhotoAsset(_ pair: LivePhotoPair) async throws -> String {
         guard FileManager.default.fileExists(atPath: pair.heicURL.path),
               FileManager.default.fileExists(atPath: pair.movURL.path) else {
             throw LivePhotoEngineError.photosSaveFailed("HEIC/MOV missing before Photos save")
@@ -363,8 +326,10 @@ final class LivePhotoEngine {
             DropLog.log("saveToPhotos missing placeholder after create")
             throw LivePhotoEngineError.photosSaveFailed("Photos did not return a created asset")
         }
-        DropLog.log("saveToPhotos asset created id=\(assetID)")
+        return assetID
+    }
 
+    static func addPhotoAsset(_ assetID: String, toAlbum albumID: String) async throws {
         var didAdd = false
         try await PHPhotoLibrary.shared().performChanges {
             let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
@@ -401,29 +366,45 @@ final class LivePhotoEngine {
         DropLog.log("saveToPhotos ok")
     }
 
-    /// Convenience: resolve/create album by name, then save.
-    static func saveToPhotos(_ pair: LivePhotoPair, albumTitle: String) async throws {
-        let album = try await resolveOrCreateAlbum(titled: albumTitle)
-        try await saveToPhotos(pair, album: album)
-    }
-
-    static func exportPair(_ pair: LivePhotoPair, to directory: URL) throws -> (URL, URL) {
+    /// Stage both files in the destination filesystem. Publish without replacing existing files.
+    static func exportPair(_ pair: LivePhotoPair, to directory: URL, sourceName: String) throws -> (URL, URL) {
+        let fm = FileManager.default
         var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDir), isDir.boolValue else {
+        guard fm.fileExists(atPath: directory.path, isDirectory: &isDir), isDir.boolValue else {
             throw LivePhotoEngineError.exportFolderMissing
         }
-        let base = "LivePhoto-\(pair.assetIdentifier.prefix(8))"
-        let heicDest = directory.appendingPathComponent("\(base).HEIC")
-        let movDest = directory.appendingPathComponent("\(base).MOV")
-        if FileManager.default.fileExists(atPath: heicDest.path) {
-            try FileManager.default.removeItem(at: heicDest)
+        let stage = directory.appendingPathComponent(".LivePhoto-" + UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: stage, withIntermediateDirectories: false)
+        defer { try? fm.removeItem(at: stage) }
+        let still = stage.appendingPathComponent("still.HEIC")
+        let movie = stage.appendingPathComponent("motion.MOV")
+        try fm.copyItem(at: pair.heicURL, to: still)
+        try fm.copyItem(at: pair.movURL, to: movie)
+
+        var stem = URL(fileURLWithPath: sourceName).deletingPathExtension().lastPathComponent
+        while stem.utf8.count > 180 { stem.removeLast() }
+        if stem.isEmpty || stem.hasPrefix(".") { stem = "Live Photo" }
+        var number = 1
+        while true {
+            let base = number == 1 ? stem : "\(stem) (\(number))"
+            number += 1
+            let photoURL = directory.appendingPathComponent(base + ".HEIC")
+            let movieURL = directory.appendingPathComponent(base + ".MOV")
+            if fm.fileExists(atPath: photoURL.path) || fm.fileExists(atPath: movieURL.path) { continue }
+            // RENAME_EXCL also protects concurrent exports between the check and publication.
+            guard renamex_np(still.path, photoURL.path, UInt32(RENAME_EXCL)) == 0 else {
+                let code = errno
+                if code == EEXIST { continue }
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(code))
+            }
+            if renamex_np(movie.path, movieURL.path, UInt32(RENAME_EXCL)) == 0 {
+                return (photoURL, movieURL)
+            }
+            let code = errno
+            // Retract only our own still, retaining it in staging for a collision retry.
+            try fm.moveItem(at: photoURL, to: still)
+            if code != EEXIST { throw NSError(domain: NSPOSIXErrorDomain, code: Int(code)) }
         }
-        if FileManager.default.fileExists(atPath: movDest.path) {
-            try FileManager.default.removeItem(at: movDest)
-        }
-        try FileManager.default.copyItem(at: pair.heicURL, to: heicDest)
-        try FileManager.default.copyItem(at: pair.movURL, to: movDest)
-        return (heicDest, movDest)
     }
 
     @MainActor
@@ -441,21 +422,14 @@ final class LivePhotoEngine {
         at seconds: TimeInterval,
         assetIdentifier: String,
         to destinationURL: URL
-    ) async throws {
+    ) async throws -> Double {
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.requestedTimeToleranceAfter = .zero
         generator.requestedTimeToleranceBefore = .zero
 
-        let time = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
-        let cgImage: CGImage
-        if #available(macOS 13.0, *) {
-            let result = try await generator.image(at: time)
-            cgImage = result.image
-        } else {
-            var actual = CMTime.zero
-            cgImage = try generator.copyCGImage(at: time, actualTime: &actual)
-        }
+        let time = CMTime(seconds: max(0, seconds), preferredTimescale: 60_000)
+        let frame = try await generator.image(at: time)
 
         guard let dest = CGImageDestinationCreateWithURL(
             destinationURL as CFURL,
@@ -472,17 +446,18 @@ final class LivePhotoEngine {
             kCGImagePropertyMakerAppleDictionary: makerNote,
             kCGImageDestinationLossyCompressionQuality: 0.95
         ]
-        CGImageDestinationAddImage(dest, cgImage, properties as CFDictionary)
+        CGImageDestinationAddImage(dest, frame.image, properties as CFDictionary)
         guard CGImageDestinationFinalize(dest) else {
             throw LivePhotoEngineError.cannotWriteHEIC
         }
+        return frame.actualTime.seconds
     }
 
     private static func writeLiveMOV(
         source: AVAsset,
         segment: LivePhotoSegment,
         assetIdentifier: String,
-        keyframePercent: Double,
+        coverOffset: Double,
         to destinationURL: URL,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
@@ -500,9 +475,9 @@ final class LivePhotoEngine {
         let nominalRate = try await videoTrack.load(.nominalFrameRate)
         let frameRate = max(nominalRate > 0 ? nominalRate : 30, 1)
 
-        let transformed = naturalSize.applying(preferredTransform)
-        let width = abs(transformed.width)
-        let height = abs(transformed.height)
+        // The reader supplies encoded pixels. The MOV track transform rotates them for display.
+        let width = naturalSize.width
+        let height = naturalSize.height
         guard width > 0, height > 0 else {
             throw LivePhotoEngineError.noVideoTrack
         }
@@ -587,22 +562,21 @@ final class LivePhotoEngine {
             }
         }
 
-        writer.startWriting()
-        reader.startReading()
+        guard writer.startWriting() else { throw writer.error ?? LivePhotoEngineError.cannotCreateWriter }
+        guard reader.startReading() else { throw reader.error ?? LivePhotoEngineError.cannotCreateReader }
         writer.startSession(atSourceTime: .zero)
 
-        let outputDuration = CMTime(seconds: max(segment.duration, 0.01), preferredTimescale: 600)
+        let outputDuration = CMTime(seconds: segment.duration, preferredTimescale: 60_000)
         let frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(frameRate.rounded(), 1)))
-        let stillStart = CMTimeMultiplyByFloat64(
-            outputDuration,
-            multiplier: max(0.05, min(keyframePercent, 0.95))
-        )
-        stillAdaptor.append(
+        let stillStart = CMTime(seconds: min(coverOffset, max(0, segment.duration - 1.0 / 60_000)), preferredTimescale: 60_000)
+        let markerDuration = CMTimeMinimum(frameDuration, outputDuration - stillStart)
+        guard stillAdaptor.append(
             AVTimedMetadataGroup(
                 items: [metadataItemForStillImageTime()],
-                timeRange: CMTimeRange(start: stillStart, duration: frameDuration)
+                timeRange: CMTimeRange(start: stillStart, duration: markerDuration)
             )
-        )
+        ) else { throw writer.error ?? LivePhotoEngineError.cannotCreateWriter }
+        stillAdaptor.assetWriterInput.markAsFinished()
 
         let totalFrames = max(Int(segment.duration * Double(frameRate)), 1)
 
